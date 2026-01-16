@@ -79,13 +79,17 @@ class ExportService {
 
       // Add answers for each question
       questions.forEach(question => {
-        const answer = response.Answers.find(a => a.question_id === question.id);
-        if (answer) {
-          // If it's a multiple choice, use option text; otherwise use text answer
-          const answerValue = answer.QuestionOption
-            ? answer.QuestionOption.option_text
-            : answer.answer_text || '';
-          row.push(answerValue);
+        // Find ALL answers for this question (to handle multiple choice/checkbox)
+        const questionAnswers = response.Answers.filter(a => a.question_id === question.id);
+
+        if (questionAnswers.length > 0) {
+          const answerValues = questionAnswers.map(answer => {
+            return answer.QuestionOption
+              ? answer.QuestionOption.option_text
+              : (answer.answer_text || '');
+          });
+          // Join multiple values with a semicolon and space
+          row.push(answerValues.filter(v => v).join('; '));
         } else {
           row.push('');
         }

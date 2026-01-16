@@ -14,21 +14,17 @@ class CollectorService {
   /**
    * Check if user has access to survey (Owner, Admin, or Workspace Member)
    */
+  /**
+   * Check if user has access to survey (Owner, Admin, or Workspace Member)
+   */
   async checkAccess(survey, user) {
+    // Admin has access to everything
     if (user.role === 'admin') return true;
-    if (survey.created_by === user.id) return true;
 
-    if (survey.workspace_id) {
-      const member = await WorkspaceMember.findOne({
-        where: {
-          workspace_id: survey.workspace_id,
-          user_id: user.id
-        }
-      });
-      if (member) return true;
-    }
-
-    return false;
+    // Use unified access service
+    // This handles: Creator, Workspace Member, and Direct Access Grants
+    const surveyAccessService = require('../../surveys/service/surveyAccess.service');
+    return await surveyAccessService.hasAccess(survey.id, user.id, 'view');
   }
 
   /**
@@ -41,8 +37,59 @@ class CollectorService {
       throw new Error('Survey not found');
     }
 
-    // Check access
-    const hasAccess = await this.checkAccess(survey, user);
+    // Enhanced access check for respondents
+    let hasAccess = false;
+
+    // Admin always has access
+    if (user.role === 'admin') {
+      hasAccess = true;
+    }
+    // Survey creator has access
+    else if (survey.created_by === user.id) {
+      hasAccess = true;
+    }
+    // Check if user is a respondent trying to start the survey
+    else if (user.role === 'user') {
+      // For internal surveys, check workspace membership
+      if (survey.access_type === 'internal' && survey.workspace_id) {
+        const workspaceMember = await WorkspaceMember.findOne({
+          where: {
+            workspace_id: survey.workspace_id,
+            user_id: user.id,
+            is_active: true
+          }
+        });
+        hasAccess = !!workspaceMember;
+      }
+      // For private surveys, check if user has an invitation
+      else if (survey.access_type === 'private') {
+        const { SurveyInvite } = require('../../../models');
+        const { User } = require('../../../models');
+
+        // Get user's email
+        const userRecord = await User.findByPk(user.id);
+        if (userRecord) {
+          const invitation = await SurveyInvite.findOne({
+            where: {
+              survey_id: surveyId,
+              email: userRecord.email,
+              status: 'pending'
+            }
+          });
+          hasAccess = !!invitation;
+        }
+      }
+      // For public surveys, everyone has access
+      else if (survey.access_type === 'public' || survey.access_type === 'public_with_login') {
+        hasAccess = true;
+      }
+    }
+    // For creators, use the unified access service
+    else {
+      const surveyAccessService = require('../../surveys/service/surveyAccess.service');
+      hasAccess = await surveyAccessService.hasAccess(survey.id, user.id, 'view');
+    }
+
     if (!hasAccess) {
       throw new Error('Access denied');
     }
@@ -52,9 +99,17 @@ class CollectorService {
       order: [['created_at', 'DESC']]
     });
 
-    return {
-      survey_id: surveyId,
-      collectors: collectors.map(c => ({
+    // Get dynamic counts for accuracy (in case cache is out of sync)
+    // and map to response format
+    const mappedCollectors = await Promise.all(collectors.map(async c => {
+      const realCount = await SurveyResponse.count({
+        where: {
+          collector_id: c.id,
+          status: 'completed'
+        }
+      });
+
+      return {
         id: c.id,
         type: c.collector_type,
         name: c.name,
@@ -62,9 +117,14 @@ class CollectorService {
         url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/collector/${c.token}`,
         is_active: c.is_active,
         allow_multiple_responses: c.allow_multiple_responses,
-        response_count: c.response_count,
+        response_count: realCount, // Use real-time count
         created_at: c.created_at
-      }))
+      };
+    }));
+
+    return {
+      survey_id: surveyId,
+      collectors: mappedCollectors
     };
   }
 

@@ -4,14 +4,54 @@ const logger = require('../../../utils/logger');
 
 class UserController {
   /**
+   * Create new user
+   */
+  async createUser(req, res) {
+    try {
+      const { email, password, full_name } = req.body;
+
+      if (!email || !password || !full_name) {
+        return res.status(400).json({
+          error: true,
+          message: 'Missing required fields: email, password, full_name'
+        });
+      }
+
+      const newUser = await userService.createUser(req.body);
+
+      return res.status(201).json({
+        error: false,
+        message: 'User created successfully',
+        data: { user: newUser }
+      });
+    } catch (error) {
+      logger.error('Error creating user:', error);
+
+      if (error.message.includes('already in use')) {
+        return res.status(409).json({
+          error: true,
+          message: error.message
+        });
+      }
+
+      return res.status(500).json({
+        error: true,
+        message: 'An error occurred while creating user'
+      });
+    }
+  }
+
+  /**
    * Get all users (paginated)
    */
   async getAllUsers(req, res) {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
+      const search = req.query.search || '';
+      const role = req.query.role || '';
 
-      const result = await userService.getAllUsers(page, limit);
+      const result = await userService.getAllUsers(page, limit, search, role);
 
       return res.status(200).json({
         error: false,
@@ -49,14 +89,14 @@ class UserController {
       });
     } catch (error) {
       logger.error(`Error fetching user with ID ${req.params.id}:`, error);
-      
+
       if (error.message === 'User not found') {
         return res.status(404).json({
           error: true,
           message: error.message
         });
       }
-      
+
       return res.status(500).json({
         error: true,
         message: 'An error occurred while fetching user'
@@ -111,14 +151,14 @@ class UserController {
       });
     } catch (error) {
       logger.error(`Error updating user with ID ${req.params.id}:`, error);
-      
+
       if (error.message === 'User not found') {
         return res.status(404).json({
           error: true,
           message: error.message
         });
       }
-      
+
       return res.status(500).json({
         error: true,
         message: 'An error occurred while updating user'
@@ -141,14 +181,14 @@ class UserController {
       });
     } catch (error) {
       logger.error(`Error deleting user with ID ${req.params.id}:`, error);
-      
+
       if (error.message === 'User not found') {
         return res.status(404).json({
           error: true,
           message: error.message
         });
       }
-      
+
       return res.status(500).json({
         error: true,
         message: 'An error occurred while deleting user'

@@ -1,73 +1,64 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../../contexts/ToastContext';
-import { useAuth } from '../../../contexts/AuthContext';
 import SurveyService from '../../../api/services/survey.service';
-import ResponseService from '../../../api/services/response.service';
-import Loader from '../../../components/common/Loader/Loader';
-import StatusBadge from '../../../components/UI/StatusBadge';
-import SurveyAccess from '../../../components/SurveyAccess';
-import { getQuestionTypeLabel } from '../../../utils/questionTypes';
+import AnalyticsService from '../../../api/services/analytics.service'; // Import AnalyticsService
+// import SurveyAccess from '../../../components/SurveyAccess';
+
+// Tabs
+import OverviewTab from './components/OverviewTab';
+import QuestionsTab from './components/QuestionsTab';
+import ResponsesTab from './components/ResponsesTab';
+import AiInsightsTab from './components/AiInsightsTab';
+// Chat
+import AnalysisChat from '../../../components/Analytics/AnalysisChat';
+import FeedbackForm from '../../../components/Surveys/FeedbackForm'; // Import FeedbackForm
+
+
 import styles from './Results.module.scss';
+import { FaFilter, FaRedo } from 'react-icons/fa';
 
 const SurveyResults = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  // const { state } = useAuth();
   const { showToast } = useToast();
-  const { state } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [survey, setSurvey] = useState(null);
-  const [responses, setResponses] = useState([]);
-  const [expandedResponse, setExpandedResponse] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [analyticsOverview, setAnalyticsOverview] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Filter State
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState({});
+  const [availableSegments, setAvailableSegments] = useState(null);
+  const [selectedIdentity, setSelectedIdentity] = useState('');
+  const [selectedQuestion, setSelectedQuestion] = useState('');
+  const [selectedOption, setSelectedOption] = useState('');
+
+  // Internal Feedback Modal State
+  const [showInternalFeedback, setShowInternalFeedback] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('[Results] Fetching data for survey:', id);
+      // Fetch Survey, Segments AND Analytics Overview (Single Source of Truth)
+      const [surveyData, segmentsData, overviewData] = await Promise.all([
+        SurveyService.getById(id),
+        AnalyticsService.getSegments(id),
+        AnalyticsService.getOverview(id) // Fetch real-time count
+      ]);
 
-      // Fetch survey data
-      const surveyData = await SurveyService.getById(id);
-      console.log('[Results] Survey data loaded:', surveyData?.title);
       setSurvey(surveyData);
+      setAnalyticsOverview(overviewData);
 
-      // Fetch responses
-      let responsesData = null;
-      try {
-        responsesData = await ResponseService.getResponsesBySurvey(id);
-        console.log('[Results] Responses loaded:', {
-          ok: responsesData?.ok,
-          total: responsesData?.total,
-          count: responsesData?.responses?.length
-        });
-      } catch (responseError) {
-        console.error('[Results] Failed to load responses:', responseError);
-        // Don't fail the entire page if responses fail to load
-        showToast(responseError?.response?.data?.message || responseError?.message || 'Failed to load responses', 'error');
-        responsesData = { ok: false, responses: [], total: 0 };
-      }
-
-      // Handle response data
-      if (responsesData?.ok) {
-        const responses = responsesData.responses || responsesData.data?.responses || [];
-
-        console.log('[Results] Setting responses:', responses.length);
-        setResponses(responses);
-
-        // Calculate stats
-        calculateStats(surveyData, responses);
-      } else {
-        console.warn('[Results] No valid response data, using empty array');
-        setResponses([]);
-        calculateStats(surveyData, []);
-        if (responsesData?.message) {
-          showToast(responsesData.message, 'error');
-        }
+      if (segmentsData) {
+        setAvailableSegments(segmentsData); // { identity: [], questions: [] }
       }
     } catch (error) {
-      console.error('[Results] Load error:', error);
-      showToast(error?.response?.data?.message || error?.message || 'Failed to load results', 'error');
+      console.error('Failed to load survey data:', error);
+      showToast('Failed to load survey data', 'error');
     } finally {
       setLoading(false);
     }
@@ -77,489 +68,359 @@ const SurveyResults = () => {
     fetchData();
   }, [fetchData]);
 
-  const calculateStats = (surveyData, responsesData) => {
-    const questionStats = {};
-
-    // Handle empty or invalid responses
-    if (!responsesData || !Array.isArray(responsesData) || responsesData.length === 0) {
-      setStats({
-        totalResponses: 0,
-        questionStats: {}
-      });
-      return;
+  // Handle Filter Logic
+  const handleFilterChange = useCallback(() => {
+    const newFilters = {};
+    if (selectedIdentity) newFilters.identityType = selectedIdentity;
+    if (selectedQuestion && selectedOption) {
+      newFilters.questionFilter = {
+        questionId: selectedQuestion,
+        optionId: selectedOption
+      };
     }
+    setFilters(newFilters);
+  }, [selectedIdentity, selectedQuestion, selectedOption]);
 
-    // Process each response
-    responsesData.forEach(response => {
-      const answersData = response.Answers || response.answers;
-      if (!answersData) return;
+  // Auto-apply filters when selection changes (optional, or use Apply button)
+  useEffect(() => {
+    handleFilterChange();
+  }, [handleFilterChange]);
 
-      const answers = typeof answersData === 'string'
-        ? JSON.parse(answersData)
-        : answersData;
-
-      if (!Array.isArray(answers)) return;
-
-      answers.forEach(answer => {
-        // Debug log
-        console.log('[Results] Processing answer:', answer);
-
-        // Handle both structure types (direct value or object with value)
-        const qId = parseInt(answer.question_id || answer.questionId);
-
-        // Get answer value: check text_answer, numeric_answer, value, option text, or option_id
-        let val = answer.text_answer;
-        if (val === null || val === undefined) val = answer.numeric_answer;
-        if (val === null || val === undefined) val = answer.value;
-        if ((val === null || val === undefined) && answer.QuestionOption) val = answer.QuestionOption.option_text;
-        if (val === null || val === undefined) val = answer.option_id;
-
-        if (!qId) return;
-
-        if (!questionStats[qId]) {
-          questionStats[qId] = {
-            total: 0,
-            values: []
-          };
-        }
-        questionStats[qId].total++;
-        if (val !== null && val !== undefined) {
-          questionStats[qId].values.push(val);
-        }
-      });
-    });
-
-    setStats({
-      totalResponses: responsesData.length,
-      questionStats
-    });
+  const handleClearFilters = () => {
+    setSelectedIdentity('');
+    setSelectedQuestion('');
+    setSelectedOption('');
+    setFilters({});
   };
 
-  const toggleResponse = (responseId) => {
-    setExpandedResponse(expandedResponse === responseId ? null : responseId);
+  // Helper getters for robust data access
+  const getResponseCount = () => {
+    if (analyticsOverview) return analyticsOverview.totalResponses;
+    return survey?.response_count || 0; // Fallback
   };
 
-  const formatAnswer = (value) => {
-    if (value === null || value === undefined) return 'N/A';
-    if (Array.isArray(value)) {
-      return value.join(', ');
-    }
-    return String(value);
+  const getQuestionCount = () => {
+    if (analyticsOverview?.questionsCount) return analyticsOverview.questionsCount;
+    return availableSegments?.questions?.length || 0; // Fallback
   };
 
-  const renderQuestionStats = (question) => {
-    if (!stats || !stats.questionStats[question.id]) {
-      return <div className={styles.noData}>No responses yet</div>;
-    }
+  const hasResponses = getResponseCount() > 0;
 
-    const questionStat = stats.questionStats[question.id];
-    const values = questionStat.values;
+  // ... (rest of component logic)
 
-    // For rating questions, calculate average
-    if (question.type === 'rating' || question.type === 'number' || question.type === 'likert_scale') {
-      const numericValues = values.map(v => parseFloat(v)).filter(v => !isNaN(v));
-      if (numericValues.length > 0) {
-        const avg = numericValues.reduce((a, b) => a + b, 0) / numericValues.length;
-        const min = Math.min(...numericValues);
-        const max = Math.max(...numericValues);
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: null },
+    { id: 'questions', label: 'Questions', icon: null }, // Reordered: Overview -> Questions -> Responses
+    { id: 'responses', label: 'Responses', icon: null },
+    { id: 'insights', label: 'AI Insights', icon: null },
+    { id: 'chat', label: 'Ask AI', icon: null }
+  ];
 
-        return (
-          <div className={styles.numericStats}>
-            <div className={styles.statItem}>
-              <span className={styles.statLabel}>Average:</span>
-              <span className={styles.statValue}>{avg.toFixed(2)}</span>
-            </div>
-            <div className={styles.statItem}>
-              <span className={styles.statLabel}>Min:</span>
-              <span className={styles.statValue}>{min}</span>
-            </div>
-            <div className={styles.statItem}>
-              <span className={styles.statLabel}>Max:</span>
-              <span className={styles.statValue}>{max}</span>
-            </div>
-            <div className={styles.statItem}>
-              <span className={styles.statLabel}>Responses:</span>
-              <span className={styles.statValue}>{numericValues.length}</span>
-            </div>
-          </div>
-        );
-      }
-    }
+  const getOptionsForQuestion = (qId) => {
+    // Find question in availableSegments.questions
+    const q = availableSegments?.questions?.find(item => item.questionId === parseInt(qId));
+    return q ? q.options : []; // options: [{ id, text }]
+  };
 
-    // For choice questions, count occurrences
-    if (question.type === 'single_choice' || question.type === 'multiple_choice' || question.type === 'dropdown' || question.type === 'checkbox') {
-      const counts = {};
-      values.forEach(value => {
-        const vals = Array.isArray(value) ? value : [value];
-        vals.forEach(v => {
-          counts[v] = (counts[v] || 0) + 1;
-        });
-      });
-
-      const total = ['single_choice', 'dropdown'].includes(question.type) ? values.length : Object.values(counts).reduce((a, b) => a + b, 0);
-
-      return (
-        <div className={styles.choiceStats}>
-          {Object.entries(counts).map(([optionKey, count]) => {
-            // Try to find option text if key is ID
-            let optionText = optionKey;
-            const optionId = parseInt(optionKey);
-            if (!isNaN(optionId)) {
-              const option = question.options?.find(o => o.id === optionId);
-              if (option) optionText = option.text;
-            }
-
-            const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
-
-            return (
-              <div key={optionKey} className={styles.choiceItem}>
-                <div className={styles.choiceLabel}>
-                  <span>{optionText}</span>
-                  <span className={styles.choiceCount}>{count} ({percentage}%)</span>
-                </div>
-                <div className={styles.choiceBar}>
-                  <div
-                    className={styles.choiceBarFill}
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    // For text questions, show response count
-    return (
-      <div className={styles.textStats}>
-        <span className={styles.responseCount}>{values.length} text responses</span>
-        <div className={styles.recentResponses}>
-          {values.slice(0, 5).map((val, idx) => (
-            <div key={idx} className={styles.textResponseItem}>"{val}"</div>
+  // Helper for generating Skeleton UI
+  const renderSkeletons = () => (
+    <div className={styles.content}>
+      {activeTab === 'overview' && (
+        <div className={styles.statsOverview}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className={`${styles.skeleton} ${styles.skeletonStats}`} />
           ))}
         </div>
-      </div>
-    );
-  };
-
-  // Export PDF function
-  const handleExportPDF = async () => {
-    try {
-      // Dynamically import libraries to avoid load issues if not installed yet
-      const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
-
-      const element = document.querySelector(`.${styles.results}`);
-      if (!element) return;
-
-      // Show loading toast
-      const toastId = showToast('Generating PDF...', 'info');
-
-      // Create canvas
-      const canvas = await html2canvas(element, {
-        scale: 2, // Higher scale for better quality
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#1a1d21' // Match dark theme background
-      });
-
-      // Calculate dimensions
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 30;
-
-      // Add title
-      pdf.setFontSize(18);
-      pdf.text(survey.title, 10, 20);
-      pdf.setFontSize(12);
-      pdf.text(`Generated on: ${new Date().toLocaleString()}`, 10, 28);
-
-      // Add image (scaled to fit)
-      // For long content, we might need multi-page logic, but for now simple fit
-      // A better approach for long content is to capture sections individually
-
-      // Simple single page fit for now
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfImgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      // If content is longer than one page
-      if (pdfImgHeight > pdfHeight) {
-        // Multi-page logic could be added here
-        // For now, just add the image and let it be
-        pdf.addImage(imgData, 'PNG', 0, 40, pdfWidth, pdfImgHeight);
-      } else {
-        pdf.addImage(imgData, 'PNG', 0, 40, pdfWidth, pdfImgHeight);
-      }
-
-      pdf.save(`${survey.title.replace(/\s+/g, '_')}_results.pdf`);
-
-      // Dismiss loading toast
-      // (Assuming showToast returns an ID or handle to dismiss/update)
-
-    } catch (error) {
-      console.error('Export PDF error:', error);
-      showToast('Failed to export PDF. Please ensure libraries are installed.', 'error');
-    }
-  };
-
-  if (loading) return <Loader />;
-
-  if (!survey) {
-    return (
-      <div className={styles.error}>
-        <h2>Survey not found</h2>
-        <button onClick={() => navigate('/surveys')}>Back to Surveys</button>
-      </div>
-    );
-  }
+      )}
+      <div className={`${styles.skeleton} ${styles.skeletonCard}`} />
+    </div>
+  );
 
   return (
     <div className={styles.results}>
+      {/* 1. Header Shell - Always Visible */}
       <div className={styles.header}>
-        <button onClick={() => navigate('/surveys')} className={styles.backButton}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          Back
-        </button>
-        <div className={styles.titleSection}>
-          <div>
-            <h1>{survey.title}</h1>
-            <p className={styles.subtitle}>Survey Results & Analytics</p>
-          </div>
-          <StatusBadge status={survey.status} />
-        </div>
-      </div>
+        <div className={styles.headerContent}>
+          <div className={styles.titleSection}>
+            {loading || !survey ? (
+              <div className={`${styles.skeleton} ${styles.skeletonText}`} style={{ width: '300px', height: '40px' }} />
+            ) : (
+              <h1>{survey.title}</h1>
+            )}
 
-      <div className={styles.statsOverview}>
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}>📊</div>
-          <div className={styles.statContent}>
-            <div className={styles.statNumber}>{stats?.totalResponses || 0}</div>
-            <div className={styles.statLabel}>Total Responses</div>
-          </div>
-        </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}>📝</div>
-          <div className={styles.statContent}>
-            <div className={styles.statNumber}>{survey.template?.Questions?.length || survey.questions?.length || 0}</div>
-            <div className={styles.statLabel}>Questions</div>
-          </div>
-        </div>
-
-        <div className={styles.statCard}>
-          <div className={styles.statIcon}>📅</div>
-          <div className={styles.statContent}>
-            <div className={styles.statNumber}>
-              {new Date(survey.start_date).toLocaleDateString()}
+            <div className={styles.metaLine}>
+              {loading || !survey ? (
+                <div className={`${styles.skeleton} ${styles.skeletonText}`} style={{ width: '200px', margin: 0 }} />
+              ) : (
+                <>
+                  <span className={`${styles.statusBadge} ${styles[`status${survey.status.charAt(0).toUpperCase() + survey.status.slice(1)}`]}`}>
+                    {survey.status}
+                  </span>
+                  <span className={styles.dot}>·</span>
+                  <span>{getQuestionCount()} questions</span>
+                  <span className={styles.dot}>·</span>
+                  <span className={styles.responseCount}>
+                    {getResponseCount()} {getResponseCount() === 1 ? 'response' : 'responses'} collected
+                  </span>
+                </>
+              )}
             </div>
-            <div className={styles.statLabel}>Start Date</div>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.content}>
-        <div className={styles.mainColumn}>
-          {/* Question Statistics */}
-          <div className={styles.section}>
-            <h2>Question Statistics</h2>
-
-            {survey.template?.Questions?.length === 0 ? (
-              <div className={styles.emptyState}>
-                <p>No questions in this survey</p>
-              </div>
-            ) : (
-              <div className={styles.questionsList}>
-                {survey.template?.Questions?.sort((a, b) => a.display_order - b.display_order).map((question, index) => (
-                  <div key={question.id} className={styles.questionCard}>
-                    <div className={styles.questionHeader}>
-                      <span className={styles.questionNumber}>Q{index + 1}</span>
-                      <h3>{question.label || question.question_text || 'Untitled question'}</h3>
-                      <span className={styles.questionType}>{getQuestionTypeLabel(question)}</span>
-                    </div>
-                    <div className={styles.questionStats}>
-                      {renderQuestionStats(question)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Individual Responses */}
-          <div className={styles.section}>
-            <h2>Individual Responses ({responses.length})</h2>
-
-            {responses.length === 0 ? (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>📭</div>
-                <p>No responses yet</p>
-                <button
-                  onClick={() => navigate(`/surveys/${id}/distribute`)}
-                  className={styles.primaryButton}
-                >
-                  Distribute Survey
-                </button>
-              </div>
-            ) : (
-              <div className={styles.responsesList}>
-                {responses.map((response, index) => {
-                  const answersData = response.Answers || response.answers || [];
-                  const answers = typeof answersData === 'string'
-                    ? JSON.parse(answersData)
-                    : answersData;
-                  const isExpanded = expandedResponse === response.id;
-
-                  return (
-                    <div key={response.id} className={styles.responseCard}>
-                      <div
-                        className={styles.responseHeader}
-                        onClick={() => toggleResponse(response.id)}
-                      >
-                        <div className={styles.responseInfo}>
-                          <span className={styles.responseNumber}>
-                            {response.User ? (
-                              <>
-                                {response.User.full_name || response.User.username}
-                                {response.User.email && (
-                                  <span className={styles.respondentEmail}> ({response.User.email})</span>
-                                )}
-                              </>
-                            ) : (
-                              `Response #${responses.length - index}`
-                            )}
-                          </span>
-                          <span className={styles.responseDate}>
-                            {new Date(response.created_at).toLocaleString()}
-                          </span>
-                        </div>
-                        <svg
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          className={isExpanded ? styles.iconExpanded : ''}
-                        >
-                          <polyline points="6 9 12 15 18 9" />
-                        </svg>
-                      </div>
-
-                      {isExpanded && (
-                        <div className={styles.responseContent}>
-                          {Array.isArray(answers) && answers.map((answer, idx) => {
-                            // Adapt to backend structure
-                            const qId = parseInt(answer.question_id || answer.questionId);
-
-                            // Get answer value: check text_answer, numeric_answer, value, option text, or option_id
-                            let val = answer.text_answer;
-                            if (val === null || val === undefined) val = answer.numeric_answer;
-                            if (val === null || val === undefined) val = answer.value;
-                            if ((val === null || val === undefined) && answer.QuestionOption) val = answer.QuestionOption.option_text;
-                            if (val === null || val === undefined) val = answer.option_id;
-
-                            // Find question label: try from answer association first, then survey template
-                            let label = answer.Question?.label || answer.Question?.question_text;
-                            if (!label) {
-                              const question = survey.template?.Questions?.find(q => q.id === qId);
-                              label = question?.label || question?.question_text || `Question ${qId}`;
-                            }
-
-                            return (
-                              <div key={idx} className={styles.answerItem}>
-                                <div className={styles.answerQuestion}>
-                                  {label}
-                                </div>
-                                <div className={styles.answerValue}>
-                                  {formatAnswer(val)}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.sidebar}>
-          <div className={styles.actionCard}>
-            <h3>Actions</h3>
+          <div className={styles.actions}>
             <button
-              onClick={() => navigate(`/surveys/${id}/distribute`)}
+              onClick={() => setShowInternalFeedback(!showInternalFeedback)}
               className={styles.actionButton}
+              title="Leave internal feedback/notes"
+              style={{ marginRight: '8px' }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-              </svg>
-              Distribute Survey
+              Rate Quality
             </button>
             <button
               onClick={() => navigate(`/surveys/${id}/edit`)}
               className={styles.actionButton}
+              disabled={loading}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              Edit Survey
+              Edit
             </button>
             <button
-              onClick={fetchData}
-              className={styles.actionButton}
+              onClick={() => navigate(`/surveys/${id}/distribute`)}
+              className={styles.actionButtonPrimary}
+              disabled={loading}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-              </svg>
-              Refresh Data
-            </button>
-            <button
-              onClick={handleExportPDF}
-              className={styles.actionButton}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-              </svg>
-              Export PDF
+              Distribute
             </button>
           </div>
+        </div>
 
-          <div className={styles.infoCard}>
-            <h3>Export Options</h3>
-            <p className={styles.comingSoon}>CSV and Excel export coming soon!</p>
+        {/* Inline Internal Feedback Form */}
+        {showInternalFeedback && (
+          <div style={{ padding: '0 20px 20px 20px', maxWidth: '600px', margin: '0 auto' }}>
+            <FeedbackForm
+              surveyId={id}
+              source="internal"
+              onComplete={() => {
+                showToast('Internal feedback saved', 'success');
+                setShowInternalFeedback(false);
+                // Optionally refresh data if needed
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Next Action Banner - Only show when no responses */}
+      {!loading && survey && !hasResponses && (
+        <div className={styles.nextActionBanner}>
+          <div className={styles.nextActionContent}>
+            <p className={styles.nextActionMessage}>This survey has not collected any responses yet.</p>
+            <div className={styles.nextActionButtons}>
+              <button
+                onClick={() => navigate(`/surveys/${id}/distribute`)}
+                className={styles.actionButtonPrimary}
+              >
+                Distribute Survey
+              </button>
+              <button
+                onClick={() => window.open(`/s/${survey.code || ''}`, '_blank')}
+                className={styles.actionButton}
+              >
+                Preview Survey
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Toolbar (Filters) - Fixed Height Shell */}
+      <div className={styles.toolbar}>
+        <div className={styles.filterWrapper}>
+          <button
+            className={`${styles.filterToggle} ${isFiltersOpen ? styles.active : ''} ${!hasResponses ? styles.filterDisabled : ''}`}
+            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+            disabled={loading || !hasResponses}
+            title={!hasResponses ? 'Filters will be available once responses are collected' : ''}
+          >
+            <FaFilter size={12} /> Filter responses
+          </button>
+
+          {isFiltersOpen && (
+            <div className={styles.filterPopover}>
+              <div className={styles.filterRow}>
+                <label>Respondent Type</label>
+                <select
+                  value={selectedIdentity}
+                  onChange={(e) => setSelectedIdentity(e.target.value)}
+                  className={styles.filterSelect}
+                >
+                  <option value="">All Respondents</option>
+                  {availableSegments?.identity?.map(type => (
+                    <option key={type} value={type}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)} Users
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.filterRow}>
+                <label>Question</label>
+                <select
+                  value={selectedQuestion}
+                  onChange={(e) => {
+                    setSelectedQuestion(e.target.value);
+                    setSelectedOption('');
+                  }}
+                  className={styles.filterSelect}
+                >
+                  <option value="">Filter by Answer...</option>
+                  {availableSegments?.questions?.map(q => (
+                    <option key={q.questionId} value={q.questionId}>
+                      {q.questionText.length > 30 ? q.questionText.slice(0, 30) + '...' : q.questionText}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedQuestion && (
+                <div className={styles.filterRow}>
+                  <label>Option</label>
+                  <select
+                    value={selectedOption}
+                    onChange={(e) => setSelectedOption(e.target.value)}
+                    className={styles.filterSelect}
+                  >
+                    <option value="">Select Option</option>
+                    {getOptionsForQuestion(selectedQuestion).map(opt => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.text}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {(selectedIdentity || selectedQuestion) && (
+                <div className={styles.filterActions}>
+                  <button onClick={handleClearFilters} className={styles.clearFilters}>
+                    <FaRedo size={12} /> Reset Changes
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right side of toolbar can go here (e.g. Search question) */}
+        <div></div>
+      </div>
+
+      {/* 3. Tabs - Fixed Height Shell */}
+      <div className={styles.tabsHeader}>
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            className={`${styles.tabButton} ${activeTab === tab.id ? styles.active : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+            disabled={loading}
+          >
+            <span className={styles.tabIcon}>{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 4. Content Area - Handles Loading/Empty States internally */}
+      {loading ? (
+        renderSkeletons()
+      ) : !survey ? (
+        <NotFoundRedirect navigate={navigate} />
+      ) : (
+        <div className={styles.content}>
+          <div style={{ display: activeTab === 'overview' ? 'block' : 'none' }}>
+            {(!hasResponses && !filters.identityType) ? (
+              <EmptyState survey={survey} navigate={navigate} />
+            ) : (
+              <OverviewTab surveyId={id} filters={filters} />
+            )}
           </div>
 
-          {/* Survey Access Management */}
-          {(survey?.created_by === state.user?.id || state.user?.role === 'admin') && (
-            <div className={styles.accessCard}>
-              <SurveyAccess
+          <div style={{ display: activeTab === 'questions' ? 'block' : 'none' }}>
+            {(!hasResponses && !filters.identityType) ? (
+              <EmptyState survey={survey} navigate={navigate} />
+            ) : (
+              <QuestionsTab surveyId={id} filters={filters} />
+            )}
+          </div>
+
+          <div style={{ display: activeTab === 'responses' ? 'block' : 'none' }}>
+            {(!hasResponses && !filters.identityType) ? (
+              <EmptyState survey={survey} navigate={navigate} />
+            ) : (
+              <ResponsesTab surveyId={id} survey={survey} />
+            )}
+          </div>
+
+          {activeTab === 'insights' && (
+            <AiInsightsTab surveyId={id} responseCount={survey.response_count} />
+          )}
+
+          {activeTab === 'chat' && (
+            <div className={styles.chatWrapper}>
+              <AnalysisChat
                 surveyId={id}
-                isOwner={survey?.created_by === state.user?.id || state.user?.role === 'admin'}
+                responseCount={analyticsOverview?.totalResponses || survey?.response_count || 0}
+                surveyTitle={survey?.title || 'Survey'}
               />
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+};
+
+// Extracted Empty State to keep render clean
+const EmptyState = ({ survey, navigate }) => (
+  <div className={styles.emptyStateContainer}>
+    <h3>No responses yet</h3>
+    <p className={styles.emptyExplanation}>
+      This survey has not collected any responses yet. Analytics and insights will appear here once respondents start submitting their answers.
+    </p>
+    <div className={styles.emptyNextSteps}>
+      <p className={styles.nextStepsLabel}>Next steps:</p>
+      <div className={styles.emptyActions}>
+        <button
+          onClick={() => navigate(`/surveys/${survey.id}/distribute`)}
+          className={styles.actionButtonPrimary}
+        >
+          Distribute Survey
+        </button>
+        <button
+          onClick={() => window.open(`/s/${survey.code || ''}`, '_blank')}
+          className={styles.actionButton}
+        >
+          Preview as Respondent
+        </button>
       </div>
+    </div>
+  </div>
+);
+
+const NotFoundRedirect = ({ navigate }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => navigate('/surveys'), 3000);
+    return () => clearTimeout(timer);
+  }, [navigate]);
+
+  return (
+    <div className={styles.error}>
+      <h2>Survey not found</h2>
+      <p>This survey may have been deleted or you don't have permission to view it.</p>
+      <p>Redirecting to list...</p>
+      <button onClick={() => navigate('/surveys')}>Go Back Now</button>
     </div>
   );
 };
 
 export default SurveyResults;
+

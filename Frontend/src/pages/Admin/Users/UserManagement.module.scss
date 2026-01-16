@@ -129,6 +129,47 @@
   font-weight: 500;
 }
 
+/* Bulk Actions */
+.bulkActions {
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  margin-bottom: 1.5rem;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
+.selectedCount {
+  font-weight: 600;
+  color: #0f766e;
+}
+
+.bulkDeleteButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #fee2e2;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #fecaca;
+    border-color: #fca5a5;
+  }
+}
+
+.selectedRow {
+  background-color: #f0fdfa !important;
+}
+
 .tableContainer {
   background: white;
   border-radius: 12px;
@@ -198,7 +239,7 @@
 
   &.roleCreator {
     background: #eff6ff;
-    color: #3b82f6;
+    color: $primary;
   }
 
   &.roleUser {
@@ -230,10 +271,10 @@
 }
 
 .editButton {
-  color: #3b82f6;
+  color: $primary;
 
   &:hover {
-    border-color: #3b82f6;
+    border-color: $primary;
   }
 }
 
@@ -356,12 +397,12 @@
 /* Responsive for Users table */
 @media (max-width: 1024px) {
   .tableContainer {
-    overflow-x: auto; 
+    overflow-x: auto;
   }
 
   .table {
     width: 100%;
-    table-layout: fixed; 
+    table-layout: fixed;
   }
 
   .table th,
@@ -404,7 +445,7 @@
     display: none;
   }
 
-  
+
   .nameCell {
     max-width: 160px;
     overflow: hidden;
@@ -412,5 +453,3 @@
     white-space: nowrap;
   }
 }
-
-

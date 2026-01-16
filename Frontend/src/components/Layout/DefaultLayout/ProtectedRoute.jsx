@@ -55,7 +55,7 @@ const getRoleBasedRedirect = (role) => {
  * For routes that should redirect authenticated users
  * (e.g., login, register pages)
  */
-export const PublicRoute = ({ children }) => {
+export const PublicRoute = ({ children, restricted = true }) => {
   const { state } = useAuth();
 
   // Show loader while checking auth state
@@ -63,8 +63,8 @@ export const PublicRoute = ({ children }) => {
     return <Loader fullScreen message="Loading..." />;
   }
 
-  // If authenticated, redirect to role-based dashboard
-  if (state.isAuthenticated && state.user) {
+  // If authenticated and restricted, redirect to role-based dashboard
+  if (state.isAuthenticated && state.user && restricted) {
     const redirectParam = new URLSearchParams(window.location.search).get('redirect');
     if (redirectParam) {
       return <Navigate to={decodeURIComponent(redirectParam)} replace />;

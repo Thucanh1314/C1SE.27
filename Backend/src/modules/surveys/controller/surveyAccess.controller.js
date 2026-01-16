@@ -1,6 +1,7 @@
 // src/modules/surveys/controller/surveyAccess.controller.js
 const surveyAccessService = require('../service/surveyAccess.service');
 const logger = require('../../../utils/logger');
+const { Survey, WorkspaceMember } = require('../../../models'); // Added import for models
 
 class SurveyAccessController {
   /**
@@ -56,7 +57,7 @@ class SurveyAccessController {
     try {
       const { id: surveyId, userId } = req.params;
 
-      await surveyAccessService.revokeAccess(surveyId, userId);
+      await surveyAccessService.revokeAccess(surveyId, userId, req.user.id);
 
       res.status(200).json({
         success: true,
@@ -87,7 +88,7 @@ class SurveyAccessController {
     try {
       const { id: surveyId } = req.params;
 
-      const accessGrants = await surveyAccessService.getSurveyAccessGrants(surveyId);
+      const accessGrants = await surveyAccessService.getSurveyAccessGrants(surveyId, req.user);
 
       res.status(200).json({
         success: true,

@@ -6,20 +6,26 @@ import AppRoutes from './routes/index.jsx';
 import GlobalStyles from './components/GlobalStyles/index.jsx';
 import './styles/main.scss';
 
+import { ThemeProvider } from './contexts/ThemeContext.jsx';
 import { LanguageProvider } from './contexts/LanguageContext.jsx';
+import { WorkspaceProvider } from './contexts/WorkspaceContext.jsx';
 
 function App() {
   return (
     <LanguageProvider>
-      <AuthProvider>
+      <ThemeProvider>
         <ToastProvider>
-          <GlobalStyles>
-            <Router>
-              <AppRoutes />
-            </Router>
-          </GlobalStyles>
+          <AuthProvider>
+            <WorkspaceProvider>
+              <GlobalStyles>
+                <Router>
+                  <AppRoutes />
+                </Router>
+              </GlobalStyles>
+            </WorkspaceProvider>
+          </AuthProvider>
         </ToastProvider>
-      </AuthProvider>
+      </ThemeProvider>
     </LanguageProvider>
   );
 }

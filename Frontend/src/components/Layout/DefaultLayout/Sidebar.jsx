@@ -2,25 +2,28 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import UpgradeUpsellModal from '../../UI/UpgradeUpsellModal/UpgradeUpsellModal';
 import styles from './Sidebar.module.scss';
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { state } = useAuth();
   const { t } = useLanguage();
+  const [showUpsell, setShowUpsell] = React.useState(false);
   const userRole = state.user?.role;
 
   // Define menu items based on roles
   const getMenuItems = () => {
+    // Base items for all authenticated users
     const baseItems = [
-      { path: '/notifications', label: t('notifications') || 'Notifications', icon: 'notifications' },
       { path: '/my-responses', label: t('responses'), icon: 'responses' },
-      { path: '/chat', label: t('chat'), icon: 'chat' },
     ];
 
+    // Admin view
     if (userRole === 'admin') {
       return [
         { path: '/dashboard', label: t('dashboard'), icon: 'dashboard' },
         { path: '/users', label: t('users'), icon: 'users' },
+        { path: '/admin/upgrade-requests', label: 'Upgrade Requests', icon: 'upgrade' },
         { path: '/workspaces', label: t('workspaces'), icon: 'workspaces' },
         { path: '/templates', label: t('templates'), icon: 'templates' },
         { path: '/surveys', label: t('surveys'), icon: 'surveys' },
@@ -28,10 +31,10 @@ const Sidebar = ({ isOpen, onClose }) => {
         { path: '/analytics', label: t('analytics'), icon: 'analytics' },
         { path: '/llm', label: t('llm'), icon: 'llm' },
         { path: '/my-responses', label: t('responses'), icon: 'responses' },
-        { path: '/chat', label: t('chat'), icon: 'chat' },
       ];
     }
 
+    // Creator view
     if (userRole === 'creator') {
       return [
         { path: '/dashboard', label: t('dashboard'), icon: 'dashboard' },
@@ -42,14 +45,20 @@ const Sidebar = ({ isOpen, onClose }) => {
         { path: '/analytics', label: t('analytics'), icon: 'analytics' },
         { path: '/llm', label: t('llm'), icon: 'llm' },
         { path: '/my-responses', label: t('responses'), icon: 'responses' },
-        { path: '/chat', label: t('chat'), icon: 'chat' },
       ];
     }
 
+    // User view (Dynamic)
     if (userRole === 'user') {
       return [
-        { path: '/surveys', label: t('surveys'), icon: 'surveys' },
-        { path: '/responses', label: t('responses'), icon: 'responses' },
+        { path: '/dashboard', label: t('dashboard'), icon: 'dashboard', isLocked: true },
+        { path: '/workspaces', label: t('workspaces'), icon: 'workspaces', isLocked: true },
+        { path: '/templates', label: t('templates'), icon: 'templates', isLocked: true },
+        { path: '/surveys', label: t('surveys'), icon: 'surveys', isLocked: true },
+        { path: '/collectors', label: t('collectors'), icon: 'collectors', isLocked: true },
+        { path: '/analytics', label: t('analytics'), icon: 'analytics', isLocked: true },
+        { path: '/llm', label: t('llm'), icon: 'llm', isLocked: true },
+        { path: '/my-responses', label: t('responses'), icon: 'responses' },
       ];
     }
 
@@ -130,6 +139,24 @@ const Sidebar = ({ isOpen, onClose }) => {
           <path d="M18 11c0 4.97-4.03 9-9 9H5l-3.5 2.5V11c0-4.97 4.03-9 9-9s9 4.03 9 9z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       ),
+      invitations: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M2.5 5.5l7 5 7-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      upgrade: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5" />
+          <path d="M10 6v8M7 9l3-3 3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      lock: (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      )
     };
 
     return icons[iconName] || icons.dashboard;
@@ -164,17 +191,40 @@ const Sidebar = ({ isOpen, onClose }) => {
           {menuItems.map((item) => (
             <NavLink
               key={item.path}
-              to={item.path}
+              to={item.isLocked ? '#' : item.path}
               className={({ isActive }) =>
-                `${styles.navItem} ${isActive ? styles.navItemActive : ''}`
+                `${styles.navItem} ${isActive && !item.isLocked ? styles.navItemActive : ''} ${item.isLocked ? styles.navItemLocked : ''}`
               }
-              onClick={onClose}
+              onClick={(e) => {
+                if (item.isLocked) {
+                  e.preventDefault();
+                  setShowUpsell(true);
+                } else {
+                  onClose();
+                }
+              }}
+              title={item.isLocked ? 'Upgrade to Creator to unlock' : ''}
             >
               <span className={styles.navIcon}>{getIcon(item.icon)}</span>
               <span className={styles.navLabel}>{item.label}</span>
+              {item.isLocked && <span className={styles.lockIcon}>{getIcon('lock')}</span>}
             </NavLink>
           ))}
         </nav>
+
+        {/* Upsell Modal */}
+        {showUpsell && (
+          <div className={styles.upsellWrapper}>
+            <UpgradeUpsellModal
+              isOpen={showUpsell}
+              onClose={() => setShowUpsell(false)}
+              onUpgrade={() => {
+                // Logic to open actual upgrade modal/request
+                // We'll assume the user needs to go to profile or trigger a state
+              }}
+            />
+          </div>
+        )}
 
         {/* Role indicator at bottom */}
         <div className={styles.sidebarFooter}>

@@ -53,4 +53,19 @@ router.delete('/:id', authenticate, responseController.deleteResponse);
  */
 router.post('/public/:token', optionalAuthenticate, responseController.submitPublicResponse);
 
+/**
+ * @route   POST /api/responses/start/:id
+ * @desc    Start survey session (for drop-off tracking)
+ * @access  Public
+ */
+router.post('/start/:id', optionalAuthenticate, responseController.startSession);
+
+/**
+ * @route   PUT /api/responses/:id/complete
+ * @desc    Fix stuck response by marking as completed
+ * @access  Private (Admin only)
+ */
+router.put('/:id/complete', authenticate, responseController.completeResponse);
+
+// TEMP FIX removed
 module.exports = router;

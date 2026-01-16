@@ -15,10 +15,10 @@ class ResponseLifecycleService {
         survey_id: surveyId,
         collector_id: collectorId,
         respondent_id: userId,
-        identity_used: userId ? 'identified' : 'anonymous',
         status: 'started',
-        started_at: new Date(),
-        last_activity_at: new Date(),
+        start_time: new Date(),
+        first_interaction_at: new Date(),
+        last_interaction_at: new Date(),
         session_id: sessionId
       });
 

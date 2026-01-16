@@ -20,6 +20,18 @@ const ResponseService = {
   },
 
   /**
+   * Start a new survey session (for Drop-off tracking)
+   */
+  async startSession(surveyId, collectorToken = null, sessionId = null, clientResponseId = null) {
+    const response = await http.post(`/responses/start/${surveyId}`, {
+      collector_token: collectorToken,
+      session_id: sessionId,
+      client_response_id: clientResponseId
+    });
+    return response.data;
+  },
+
+  /**
    * Get survey by public token (anonymous - no auth)
    */
   async getSurveyByToken(token) {
@@ -56,7 +68,7 @@ const ResponseService = {
    */
   async getResponsesBySurvey(surveyId, params = {}) {
     const response = await http.get(`/responses/survey/${surveyId}`, { params });
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   /**

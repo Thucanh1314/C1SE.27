@@ -26,7 +26,13 @@ class SocketService {
     }
 
     try {
-      const socketUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      // Socket.io needs the root URL, not the API namespace
+      // Remove '/api/modules' or '/api' from the end if present
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api/modules';
+      const socketUrl = apiUrl.replace(/\/api\/modules\/?$/, '').replace(/\/api\/?$/, '');
+
+      console.log('[SocketService] Connecting to:', socketUrl);
+
       const token = localStorage.getItem('token');
 
       this.socket = io(socketUrl, {
@@ -87,6 +93,36 @@ class SocketService {
       this.emit('workspaceMemberAdded', data);
     });
 
+    this.socket.on('workspace_activity', (data) => {
+      console.log('[SocketService] Workspace activity received:', data);
+      this.emit('workspaceActivity', data);
+    });
+
+    this.socket.on('workspace:member_removed', (data) => {
+      console.log('[SocketService] Removed from workspace:', data);
+      this.emit('workspaceMemberRemoved', data);
+    });
+
+    this.socket.on('role_updated', (data) => {
+      console.log('[SocketService] Role updated:', data);
+      this.emit('role_updated', data);
+    });
+
+    this.socket.on('workspace_invitation', (data) => {
+      console.log('[SocketService] Workspace invitation:', data);
+      this.emit('workspace_invitation', data);
+    });
+
+    this.socket.on('workspace_invite', (data) => {
+      console.log('[SocketService] Workspace invite:', data);
+      this.emit('workspace_invite', data);
+    });
+
+    this.socket.on('system_alert', (data) => {
+      console.log('[SocketService] System alert:', data);
+      this.emit('system_alert', data);
+    });
+
     this.socket.on('error', (error) => {
       console.error('[SocketService] Socket error:', error);
       this.emit('socketError', error);
@@ -142,6 +178,23 @@ class SocketService {
     return () => {
       this.listeners[eventName] = this.listeners[eventName].filter(cb => cb !== callback);
     };
+  }
+
+  /**
+   * Remove listener for custom events
+   */
+  off(eventName, callback = null) {
+    if (callback) {
+      // Remove specific callback
+      if (this.listeners[eventName]) {
+        this.listeners[eventName] = this.listeners[eventName].filter(cb => cb !== callback);
+      }
+    } else {
+      // Remove all listeners for this event
+      if (this.listeners[eventName]) {
+        this.listeners[eventName] = [];
+      }
+    }
   }
 
   /**

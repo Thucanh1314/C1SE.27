@@ -203,7 +203,7 @@
   transition: background-color 0.2s ease;
 
   &:hover:not(:disabled) {
-    background-color: #0056b3;
+    background-color: #0D9488;
   }
 
   &:disabled {
@@ -341,7 +341,7 @@
 
 .dangerButton {
   background-color: #dc3545 !important;
-  
+
   &:hover {
     background-color: #bd2130 !important;
   }
@@ -394,5 +394,206 @@
   .deleteButton {
     flex: 1;
     min-width: auto;
+  }
+}
+
+// New Styles for UX Improvements
+
+.summaryHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.03);
+  border-radius: 20px;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.summaryItem {
+  font-weight: 500;
+  color: #495057;
+}
+
+.summaryDivider {
+  color: #adb5bd;
+}
+
+.filterRow {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+
+  @media (min-width: 768px) {
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.quickFilters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.quickFilterBtn {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #dee2e6;
+  background: white;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: #6c757d;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #f8f9fa;
+    border-color: #ced4da;
+  }
+
+  &.active {
+    background: #e7f1ff;
+    color: #0D9488;
+    border-color: #b6d4fe;
+    font-weight: 500;
+  }
+}
+
+// Empty State Improvements
+
+.emptyTitle {
+  font-size: 1.5rem;
+  color: #343a40;
+  margin-bottom: 0.5rem;
+}
+
+.emptyBody {
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+}
+
+.primaryButton {
+  padding: 0.75rem 1.5rem;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #0D9488;
+  }
+}
+
+.secondaryButton {
+  padding: 0.5rem 1rem;
+  background-color: transparent;
+  border: 1px solid #ced4da;
+  color: #6c757d;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+  }
+}
+
+// Modal Styles
+
+.previewModalContent {
+  padding: 1rem;
+}
+
+.modalLoader {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.modalMeta {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  color: #495057;
+  line-height: 1.6;
+}
+
+.modalAnswers {
+  h4 {
+    font-size: 1.1rem;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 0.5rem;
+  }
+}
+
+.answersList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.answerRow {
+  background: white;
+  padding: 1rem;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+}
+
+.questionLabel {
+  font-weight: 600;
+  color: #343a40;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.qNum {
+  color: #adb5bd;
+  margin-right: 0.5rem;
+  font-weight: 400;
+}
+
+.answerValue {
+  color: #495057;
+  font-size: 0.95rem;
+  padding-left: 1.5rem;
+  border-left: 3px solid #007bff;
+}
+
+.errorMessage {
+  text-align: center;
+  color: #dc3545;
+  padding: 2rem;
+}
+
+.modalActions {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #e9ecef;
+  padding-top: 1rem;
+}
+
+.closeBtn {
+  padding: 0.5rem 1.5rem;
+  background: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:hover {
+    background: #5a6268;
   }
 }

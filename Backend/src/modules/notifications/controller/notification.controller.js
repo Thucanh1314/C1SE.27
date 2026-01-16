@@ -1,164 +1,145 @@
-// src/modules/notifications/controller/notification.controller.js
 const notificationService = require('../service/notification.service');
 const logger = require('../../../utils/logger');
 
 class NotificationController {
   /**
-   * GET /api/modules/notifications/unread
-   * Get unread notifications for current user
-   */
-  async getUnreadNotifications(req, res) {
-    try {
-      const { limit = 20 } = req.query;
-
-      const notifications = await notificationService.getUnreadNotifications(
-        req.user.id,
-        parseInt(limit)
-      );
-
-      res.status(200).json({
-        ok: true,
-        notifications
-      });
-    } catch (error) {
-      logger.error('Get unread notifications error:', error);
-      res.status(500).json({
-        ok: false,
-        message: error.message || 'Error fetching notifications'
-      });
-    }
-  }
-
-  /**
+   * Get user notifications
    * GET /api/modules/notifications
-   * Get all notifications for current user with pagination
    */
   async getNotifications(req, res) {
     try {
-      const { limit = 50, offset = 0 } = req.query;
+      const userId = req.user.id;
+      const { page, limit, unreadOnly, category } = req.query;
 
-      const { notifications, total } = await notificationService.getNotifications(
-        req.user.id,
-        parseInt(limit),
-        parseInt(offset)
-      );
+      const result = await notificationService.getUserNotifications(userId, {
+        page: page || 1,
+        limit: limit || 20,
+        unreadOnly: unreadOnly === 'true',
+        category: category || null
+      });
 
-      res.status(200).json({
+      res.json({
         ok: true,
-        notifications,
-        total,
-        limit: parseInt(limit),
-        offset: parseInt(offset)
+        ...result
       });
     } catch (error) {
-      logger.error('Get notifications error:', error);
+      logger.error('Error getting notifications:', error);
       res.status(500).json({
         ok: false,
-        message: error.message || 'Error fetching notifications'
+        message: error.message
       });
     }
   }
 
   /**
+   * Get unread count
    * GET /api/modules/notifications/unread-count
-   * Get count of unread notifications
    */
   async getUnreadCount(req, res) {
     try {
-      const count = await notificationService.getUnreadCount(req.user.id);
+      const userId = req.user.id;
+      const count = await notificationService.getUnreadCount(userId);
 
-      res.status(200).json({
+      res.json({
         ok: true,
         count
       });
     } catch (error) {
-      logger.error('Get unread count error:', error);
+      logger.error('Error getting unread count:', error);
       res.status(500).json({
         ok: false,
-        count: 0
+        message: error.message
       });
     }
   }
 
   /**
-   * PUT /api/modules/notifications/:id/read
    * Mark notification as read
+   * PUT /api/modules/notifications/:id/read
    */
   async markAsRead(req, res) {
     try {
-      const { id } = req.params;
+      const userId = req.user.id;
+      const notificationId = req.params.id;
 
-      const notification = await notificationService.markAsRead(id, req.user.id);
+      const notification = await notificationService.markAsRead(notificationId, userId);
 
-      res.status(200).json({
+      res.json({
         ok: true,
         notification
       });
     } catch (error) {
-      logger.error('Mark as read error:', error);
-      
-      if (error.message.includes('not found')) {
-        return res.status(404).json({
-          ok: false,
-          message: error.message
-        });
-      }
-
+      logger.error('Error marking notification as read:', error);
       res.status(500).json({
         ok: false,
-        message: error.message || 'Error marking notification as read'
+        message: error.message
       });
     }
   }
 
   /**
-   * PUT /api/modules/notifications/read-all
    * Mark all notifications as read
+   * PUT /api/modules/notifications/read-all
    */
   async markAllAsRead(req, res) {
     try {
-      await notificationService.markAllAsRead(req.user.id);
+      const userId = req.user.id;
+      const result = await notificationService.markAllAsRead(userId);
 
-      res.status(200).json({
+      res.json({
         ok: true,
-        message: 'All notifications marked as read'
+        ...result
       });
     } catch (error) {
-      logger.error('Mark all as read error:', error);
+      logger.error('Error marking all as read:', error);
       res.status(500).json({
         ok: false,
-        message: error.message || 'Error marking notifications as read'
+        message: error.message
       });
     }
   }
 
   /**
-   * DELETE /api/modules/notifications/:id
-   * Delete notification
+   * Archive notification
+   * PUT /api/modules/notifications/:id/archive
    */
-  async deleteNotification(req, res) {
+  async archiveNotification(req, res) {
     try {
-      const { id } = req.params;
+      const userId = req.user.id;
+      const notificationId = req.params.id;
 
-      await notificationService.deleteNotification(id, req.user.id);
+      const notification = await notificationService.archiveNotification(notificationId, userId);
 
-      res.status(200).json({
+      res.json({
         ok: true,
-        message: 'Notification deleted'
+        notification
       });
     } catch (error) {
-      logger.error('Delete notification error:', error);
-
-      if (error.message.includes('not found')) {
-        return res.status(404).json({
-          ok: false,
-          message: error.message
-        });
-      }
-
+      logger.error('Error archiving notification:', error);
       res.status(500).json({
         ok: false,
-        message: error.message || 'Error deleting notification'
+        message: error.message
+      });
+    }
+  }
+
+  /**
+   * Create notification (admin/system only)
+   * POST /api/modules/notifications
+   */
+  async createNotification(req, res) {
+    try {
+      const notification = await notificationService.createNotification(req.body);
+
+      res.json({
+        ok: true,
+        notification
+      });
+    } catch (error) {
+      logger.error('Error creating notification:', error);
+      res.status(500).json({
+        ok: false,
+        message: error.message
       });
     }
   }

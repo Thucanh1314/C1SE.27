@@ -12,6 +12,13 @@ const { authenticate, isTeacherOrAdmin } = require('../../../middleware/auth.mid
 router.get('/survey/:survey_id', authenticate, collectorController.getCollectorsBySurvey);
 
 /**
+ * @route   GET /api/collectors?survey_id=X
+ * @desc    Get collectors for a survey (query param version for backward compatibility)
+ * @access  Private (Creator/Admin only)
+ */
+router.get('/', authenticate, collectorController.getCollectorsBySurveyQuery);
+
+/**
  * @route   POST /api/collectors/survey/:survey_id
  * @desc    Create collector for survey
  * @access  Private (Creator/Admin only)

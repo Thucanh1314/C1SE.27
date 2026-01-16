@@ -35,11 +35,24 @@ class InviteService {
      */
     async validateToken(token) {
         try {
-            const response = await http.get(`/invites/${token}/validate`);
+            const response = await http.get(`/surveys/invites/${token}/validate`);
             return response.data?.data || null;
         } catch (error) {
             console.error('[InviteService] Validate token error:', error);
             throw error; // Propagate error to caller
+        }
+    }
+
+    /**
+     * Accept invite (public endpoint)
+     */
+    async acceptInvite(token) {
+        try {
+            const response = await http.post(`/surveys/invites/${token}/accept`);
+            return response.data?.data || {};
+        } catch (error) {
+            console.error('[InviteService] Accept invite error:', error);
+            throw error;
         }
     }
 

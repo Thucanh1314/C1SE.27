@@ -184,10 +184,10 @@
 }
 
 .copyButton {
-  color: #3b82f6;
+  color: $primary;
 
   &:hover {
-    border-color: #3b82f6;
+    border-color: $primary;
     background: #eff6ff;
   }
 }
@@ -366,7 +366,7 @@
 
 .copyLinkButton {
   padding: 0.625rem 1.25rem;
-  background: #3b82f6;
+  background: $primary;
   color: white;
   border: none;
   border-radius: 6px;
@@ -376,7 +376,7 @@
   transition: background 0.2s;
 
   &:hover {
-    background: #2563eb;
+    background: $primary-hover;
   }
 }
 
@@ -384,4 +384,50 @@
   display: flex;
   justify-content: center;
   margin-top: 2rem;
+}
+
+.actionButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.secondaryButton {
+  padding: 0.75rem 1.5rem;
+  background: white;
+  color: $primary;
+  border: 1px solid $primary;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: $primary;
+    color: white;
+  }
+}
+
+.error {
+  text-align: center;
+  padding: 3rem 2rem;
+
+  h2 {
+    color: #d32f2f;
+    margin-bottom: 1rem;
+  }
+
+  button {
+    padding: 0.75rem 1.5rem;
+    background: $primary;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+
+    &:hover {
+      background: $primary-hover;
+    }
+  }
 }

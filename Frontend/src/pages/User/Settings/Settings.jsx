@@ -1,64 +1,20 @@
-import React, { useState } from 'react';
-import { useToast } from '../../../contexts/ToastContext';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import AuthService from '../../../api/services/auth.service';
+import { useTheme } from '../../../contexts/ThemeContext';
 import Card from '../../../components/UI/Card';
 import Button from '../../../components/UI/Button';
-import Input from '../../../components/UI/Input';
-import LanguageSwitcher from '../../../components/UI/LanguageSwitcher';
 import styles from './Settings.module.scss';
+import { LuShield, LuKey, LuGlobe, LuMoon, LuSun } from 'react-icons/lu';
 
 const Settings = () => {
-    const { showToast } = useToast();
-    const { t } = useLanguage();
-    const [saving, setSaving] = useState(false);
+    const { state } = useAuth();
+    const { t, language, setLanguage } = useLanguage();
+    const { theme, toggleTheme } = useTheme();
+    const navigate = useNavigate();
 
-    const [passwordForm, setPasswordForm] = useState({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-    });
-
-    const handleChange = (field, value) => {
-        setPasswordForm(prev => ({
-            ...prev,
-            [field]: value
-        }));
-    };
-
-    const handlePasswordChange = async (e) => {
-        e.preventDefault();
-
-        if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-            showToast(t('passwords_do_not_match'), 'error');
-            return;
-        }
-
-        if (passwordForm.newPassword.length < 6) {
-            showToast(t('password_too_short'), 'error');
-            return;
-        }
-
-        try {
-            setSaving(true);
-            await AuthService.changePassword({
-                oldPassword: passwordForm.currentPassword,
-                newPassword: passwordForm.newPassword
-            });
-
-            showToast(t('password_changed'), 'success');
-            setPasswordForm({
-                currentPassword: '',
-                newPassword: '',
-                confirmPassword: ''
-            });
-        } catch (error) {
-            console.error('Change password error:', error);
-            showToast(error.response?.data?.message || 'Failed to change password', 'error');
-        } finally {
-            setSaving(false);
-        }
-    };
+    const user = state.user || {};
 
     return (
         <div className={styles.settingsContainer}>
@@ -68,50 +24,83 @@ const Settings = () => {
             </div>
 
             <div className={styles.content}>
-                <Card title={t('language')}>
-                    <LanguageSwitcher />
-                </Card>
-
-                <Card title={t('security')}>
-                    <div className={styles.sectionHeader}>
-                        <h3>{t('change_password')}</h3>
-                        <p>{t('change_password_desc')}</p>
+                {/* 1) Security Card */}
+                <Card>
+                    <div className={styles.cardHeader}>
+                        <div className={styles.iconTitle}>
+                            <LuShield className={styles.icon} />
+                            <h3>{t('security')}</h3>
+                        </div>
                     </div>
 
-                    <form onSubmit={handlePasswordChange}>
-                        <div className={styles.formStack}>
-                            <Input
-                                type="password"
-                                label={t('current_password')}
-                                value={passwordForm.currentPassword}
-                                onChange={(e) => handleChange('currentPassword', e.target.value)}
-                                placeholder={t('current_password')}
-                                required
-                            />
-                            <Input
-                                type="password"
-                                label={t('new_password')}
-                                value={passwordForm.newPassword}
-                                onChange={(e) => handleChange('newPassword', e.target.value)}
-                                placeholder={t('new_password')}
-                                required
-                            />
-                            <Input
-                                type="password"
-                                label={t('confirm_new_password')}
-                                value={passwordForm.confirmPassword}
-                                onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                                placeholder={t('confirm_new_password')}
-                                required
-                            />
-                        </div>
+                    <div className={styles.infoRow}>
+                        <span className={styles.label}>{t('email')}</span>
+                        <span className={styles.value}>{user.email || 'N/A'}</span>
+                    </div>
+                    <div className={styles.infoRow}>
+                        <span className={styles.label}>Role</span>
+                        <span className={styles.value} style={{ textTransform: 'capitalize' }}>
+                            {user.role || 'User'}
+                        </span>
+                    </div>
 
-                        <div className={styles.actions}>
-                            <Button type="submit" disabled={saving}>
-                                {saving ? t('updating') : t('update_password')}
-                            </Button>
+                    <div className={styles.actionLinks}>
+                        <Button
+                            variant="outline"
+                            className={styles.linkBtn}
+                            onClick={() => navigate('/profile')}
+                        >
+                            <LuKey className={styles.btnIcon} />
+                            {t('change_password_via_profile') || 'Change Password via Profile'}
+                        </Button>
+                    </div>
+                </Card>
+
+                {/* 2) Preferences Card */}
+                <Card>
+                    <div className={styles.cardHeader}>
+                        <div className={styles.iconTitle}>
+                            <LuGlobe className={styles.icon} />
+                            <h3>{t('preferences') || 'Preferences'}</h3>
                         </div>
-                    </form>
+                    </div>
+
+                    <div className={styles.prefRow}>
+                        <div className={styles.prefLabel}>
+                            <LuGlobe className={styles.icon} />
+                            <span>{t('language') || 'Language'}</span>
+                        </div>
+                        <div className={styles.prefControl}>
+                            <select
+                                value={language}
+                                onChange={(e) => setLanguage(e.target.value)}
+                                className={styles.select}
+                            >
+                                <option value="en">English</option>
+                                <option value="vi">Tiếng Việt</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className={styles.prefRow}>
+                        <div className={styles.prefLabel}>
+                            {theme === 'dark' ? <LuMoon className={styles.icon} /> : <LuSun className={styles.icon} />}
+                            <span>{t('theme') || 'Theme'}</span>
+                        </div>
+                        <div className={styles.prefControl}>
+                            <label className={styles.toggleSwitch}>
+                                <input
+                                    type="checkbox"
+                                    checked={theme === 'dark'}
+                                    onChange={toggleTheme}
+                                />
+                                <span className={styles.slider}></span>
+                            </label>
+                            <span className={styles.themeLabel}>
+                                {theme === 'dark' ? 'Dark' : 'Light'}
+                            </span>
+                        </div>
+                    </div>
                 </Card>
             </div>
         </div>

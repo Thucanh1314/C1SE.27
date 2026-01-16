@@ -1,0 +1,215 @@
+@use '../../../../styles/variables' as *;
+
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.cardHeader {
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #111827;
+        margin: 0;
+    }
+}
+
+.cardSub {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin: 0.25rem 0 0 0;
+}
+
+.scoreBadge {
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    color: white;
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+.metricGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+
+    @media (max-width: 768px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.metricItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.metricLabel {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 0.5rem;
+}
+
+.metricValue {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+.metricSub {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 0.25rem;
+}
+
+.insight {
+    background: #f3f4f6;
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    color: #374151;
+    border-left: 4px solid #14B8A6;
+}
+
+.chartContainer {
+    height: 300px;
+    width: 100%;
+    margin-bottom: 1.5rem;
+}
+
+.noData {
+    text-align: center;
+    padding: 2rem;
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* Cross Tab Controls */
+.controls {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.controlGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 200px;
+
+    label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #374151;
+    }
+}
+
+.select {
+    padding: 0.625rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    width: 100%;
+
+    &:focus {
+        outline: none;
+        border-color: #14B8A6;
+        box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+    }
+}
+
+.analyzeButton {
+    padding: 0.625rem 1.5rem;
+    background: #14B8A6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+        background: #0F766E;
+    }
+
+    &:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+    }
+}
+
+.resultsArea {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e5e7eb;
+
+    h4 {
+        margin: 0 0 1rem 0;
+        color: #111827;
+    }
+}
+
+.crossTabGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.resultItem {
+    background: #f9fafb;
+    padding: 1rem;
+    border-radius: 8px;
+
+    h5 {
+        margin: 0 0 0.5rem 0;
+        font-size: 0.875rem;
+        color: #374151;
+    }
+
+    ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+
+        li {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            font-size: 0.875rem;
+            color: #4b5563;
+            border-bottom: 1px solid #e5e7eb;
+
+            &:last-child {
+                border-bottom: none;
+            }
+
+            strong {
+                color: #111827;
+            }
+        }
+    }
+}
+
+.error {
+    color: #ef4444;
+    background: #fee2e2;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}

@@ -183,80 +183,200 @@
 
   &.selected {
     border-color: #14B8A6;
-    background: rgba(16, 185, 129, 0.05);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+    background: rgba(16, 185, 129, 0.02); // Much subtler
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
   }
 
   &:hover {
     border-color: #14B8A6;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
-    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08); // Soft shadow
+    transform: translateY(-2px); // Subtle lift
+    cursor: pointer;
   }
 
   .workspaceCardHeader {
     display: flex;
+    justify-content: space-between;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: 1rem;
     margin-bottom: 0.5rem;
+  }
+
+  .headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0; // Fix duplicate flex overflow issues
+  }
+
+  .headerRight {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .headerIconActions {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  .iconAction {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 0.25rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      color: #14B8A6;
+      background: #f0fdfa;
+    }
   }
 
   .workspaceCheckbox {
     width: 18px;
     height: 18px;
+    min-width: 18px;
     accent-color: #14B8A6;
     cursor: pointer;
-    margin-top: 0.1rem;
+  }
+
+  .workspaceName {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0f172a; // Darker slate
+    margin: 0;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
-.workspaceName {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 0.5rem 0;
+.badges {
+  /* Legacy class kept just in case, but structure changed in JSX */
+  display: flex;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px; // Pill shape
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.badgeOwner {
+  background-color: #14B8A6; // Solid primary
+  color: white;
+  border: 1px solid #14B8A6;
+}
+
+.badgeMember {
+  background-color: transparent;
+  color: #64748b;
+  border: 1px solid #cbd5e1; // Subtle outline
+}
+
+.badgeCollaborator {
+  background-color: #f0fdfa; // Light teal
+  color: #0d9488; // Teal 600
+  border: 1px solid #5eead4; // Teal 300
+}
+
+.workspaceSubInfo {
+  margin-bottom: 1rem;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  color: #64748b;
+
+  .metaIcon {
+    color: #94a3b8;
+  }
+
+  .workspaceOwner {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #64748b;
+  }
 }
 
 .workspaceDescription {
-  color: #666;
-  font-size: 0.95rem;
-  margin: 0 0 1rem 0;
-  line-height: 1.5;
-  min-height: 2.5rem;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
 }
 
-.workspaceMetadata {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
-  font-size: 0.8rem;
-
-  .ownerInfo {
-    color: #999;
-    font-weight: 500;
-  }
-
-  .workspaceDate {
-    color: #bbb;
-  }
+.cardDivider {
+  height: 1px;
+  background-color: #f1f5f9; // Very subtle
+  margin: 0 -1.5rem 1rem -1.5rem; // Bleed to edges
 }
 
-.openButton {
-  width: 100%;
+.actions {
+  display: flex; // Full width flex
+  gap: 1rem;
+}
+
+.actionButton {
+  flex: 1; // Grow to fill space
   padding: 0.75rem;
-  background: #14B8A6;
-  color: white;
-  border: none;
   border-radius: 6px;
   font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  text-align: center;
+  border: 1px solid transparent;
 
-  &:hover {
-    background: #0F766E;
+  &.primary {
+    background: #14B8A6;
+    color: white;
+    box-shadow: 0 2px 4px rgba(20, 184, 166, 0.2);
+
+    &:hover {
+      background: #0d9488;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 6px rgba(20, 184, 166, 0.3);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+
+  // Outline class removed from main button, but kept if needed for fallback
+  &.outline {
+    background: white;
+    border-color: #e2e8f0;
+    color: #64748b;
+
+    &:hover {
+      border-color: #14B8A6;
+      color: #14B8A6;
+    }
   }
 }
+
+// Modal styles
 
 // Modal styles
 .modalOverlay {
@@ -425,7 +545,7 @@
       &:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-        
+
         &:hover {
           border-color: #e0e0e0;
           background: white;
@@ -445,7 +565,7 @@
   justify-content: center;
   align-items: center;
   padding: 2rem;
-  
+
   .spinner {
     width: 24px;
     height: 24px;
@@ -457,6 +577,11 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }

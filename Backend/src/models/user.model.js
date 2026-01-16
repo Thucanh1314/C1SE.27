@@ -33,6 +33,23 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM('admin', 'creator', 'user'),
         defaultValue: 'user',
       },
+      auth_provider: {
+        type: DataTypes.STRING,
+        defaultValue: 'local',
+        allowNull: false,
+      },
+      provider_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      reset_password_token: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      reset_password_expires: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
       created_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,

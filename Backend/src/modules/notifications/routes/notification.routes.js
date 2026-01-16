@@ -1,43 +1,30 @@
-// src/modules/notifications/routes/notification.routes.js
 const express = require('express');
 const router = express.Router();
 const notificationController = require('../controller/notification.controller');
 const { authenticate } = require('../../../middleware/auth.middleware');
 
-/**
- * GET /api/modules/notifications/unread
- * Get unread notifications
- */
-router.get('/unread', authenticate, notificationController.getUnreadNotifications);
+// All routes require authentication
+router.use(authenticate);
 
-/**
- * GET /api/modules/notifications/unread-count
- * Get unread count
- */
-router.get('/unread-count', authenticate, notificationController.getUnreadCount);
+// Get user notifications (with filters)
+router.get('/', notificationController.getNotifications);
 
-/**
- * GET /api/modules/notifications
- * Get all notifications
- */
-router.get('/', authenticate, notificationController.getNotifications);
+// Get unread notifications (backward compatibility)
+router.get('/unread', notificationController.getNotifications);
 
-/**
- * PUT /api/modules/notifications/:id/read
- * Mark notification as read
- */
-router.put('/:id/read', authenticate, notificationController.markAsRead);
+// Get unread count
+router.get('/unread-count', notificationController.getUnreadCount);
 
-/**
- * PUT /api/modules/notifications/read-all
- * Mark all notifications as read
- */
-router.put('/read-all', authenticate, notificationController.markAllAsRead);
+// Mark notification as read
+router.put('/:id/read', notificationController.markAsRead);
 
-/**
- * DELETE /api/modules/notifications/:id
- * Delete notification
- */
-router.delete('/:id', authenticate, notificationController.deleteNotification);
+// Mark all as read
+router.put('/read-all', notificationController.markAllAsRead);
+
+// Archive notification
+router.put('/:id/archive', notificationController.archiveNotification);
+
+// Create notification (for testing/admin)
+router.post('/', notificationController.createNotification);
 
 module.exports = router;

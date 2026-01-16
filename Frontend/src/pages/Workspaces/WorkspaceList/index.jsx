@@ -6,10 +6,15 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import Loader from '../../../components/common/Loader/Loader';
 import styles from './WorkspaceList.module.scss';
 
+import { useAuth } from '../../../contexts/AuthContext';
+import { LuBox, LuUser, LuPlus, LuSettings, LuUsers, LuSearch } from 'react-icons/lu';
+import Button from '../../../components/UI/Button';
+
 const WorkspaceList = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { t } = useLanguage();
+  const { state: { user } } = useAuth(); // Get Access to User Data for permissions
 
   const [loading, setLoading] = useState(true);
   const [workspaces, setWorkspaces] = useState([]);
@@ -24,20 +29,27 @@ const WorkspaceList = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Scope State: 'my' (default) or 'all'
+  const [scope, setScope] = useState(() => {
+    return localStorage.getItem('scope.workspaces') || 'my';
+  });
+
   const [formData, setFormData] = useState({
     name: '',
     description: ''
   });
 
   // Fetch workspaces with pagination
-  const fetchWorkspaces = useCallback(async (page = 1, search = '') => {
+  const fetchWorkspaces = useCallback(async (page = 1, search = '', currentScope = 'my') => {
     try {
       setLoading(true);
       setError(null);
       const result = await WorkspaceService.getMyWorkspacesPaginated({
         page,
         limit: itemsPerPage,
-        search
+        search,
+        scope: currentScope // Pass the scope parameter
       });
 
       if (result.ok) {
@@ -72,18 +84,29 @@ const WorkspaceList = () => {
   }, [navigate, showToast, itemsPerPage, t]);
 
   useEffect(() => {
-    fetchWorkspaces(currentPage, searchTerm);
-  }, [fetchWorkspaces, currentPage, searchTerm]);
+    fetchWorkspaces(currentPage, searchTerm, scope);
+  }, [fetchWorkspaces, currentPage, searchTerm, scope]);
 
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
+      // Don't reset page here, logic should be handled with clean dependency
+      // But for now, we keep the existing pattern but invoke with correct scope
       setCurrentPage(1);
-      fetchWorkspaces(1, searchTerm);
+      fetchWorkspaces(1, searchTerm, scope);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, fetchWorkspaces]);
+  }, [searchTerm, fetchWorkspaces, scope]);
+
+  // Handle Scope Change
+  const handleScopeChange = (newScope) => {
+    if (newScope === scope) return;
+    setScope(newScope);
+    setCurrentPage(1); // Reset to page 1
+    localStorage.setItem('scope.workspaces', newScope);
+    // Fetch will trigger by useEffect
+  };
 
   const handleCreateClick = () => {
     setFormData({ name: '', description: '' });
@@ -121,7 +144,7 @@ const WorkspaceList = () => {
       if (result.ok) {
         showToast(t('workspace_created_success') || 'Workspace created successfully', 'success');
         handleCloseModal();
-        await fetchWorkspaces(); // Refresh list
+        await fetchWorkspaces(1, '', scope); // Refresh list
       } else {
         showToast(result.error || t('failed_create_workspace') || 'Failed to create workspace', 'error');
       }
@@ -180,7 +203,7 @@ const WorkspaceList = () => {
         showToast(t('workspaces_deleted_success', { count: result.deletedCount }) || `Successfully deleted ${result.deletedCount} workspace(s)`, 'success');
         setSelectedWorkspaces(new Set());
         setSelectAll(false);
-        await fetchWorkspaces(currentPage, searchTerm);
+        await fetchWorkspaces(currentPage, searchTerm, scope);
       } else {
         showToast(result.error || t('failed_delete_workspaces') || 'Failed to delete workspaces', 'error');
       }
@@ -204,15 +227,44 @@ const WorkspaceList = () => {
     setSearchTerm(e.target.value);
   };
 
-  if (loading) {
+  if (loading && workspaces.length === 0) {
     return <Loader />;
   }
+
+  const isAdmin = user && user.role === 'admin';
+  const canCreateWorkspace = user && (user.role === 'creator' || user.role === 'admin');
 
   return (
     <div className={styles.workspaceContainer}>
       <div className={styles.header}>
-        <h1>{t('workspaces')}</h1>
+        <div>
+          <h1>
+            {t('workspaces')}
+            <span style={{ fontSize: '0.6em', color: '#6b7280', marginLeft: '0.5rem', fontWeight: 'normal' }}>
+              — {scope === 'my' ? t('my_workspaces') || 'My workspaces' : t('all_workspaces') || 'All workspaces'}
+            </span>
+          </h1>
+        </div>
+
         <div className={styles.headerActions}>
+          {/* Scope Tabs - Only show if Admin */}
+          <div className={styles.scopeTabs}>
+            <Button
+              variant={scope === 'my' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => handleScopeChange('my')}
+            >
+              {t('my_workspaces') || 'My Workspaces'}
+            </Button>
+            <Button
+              variant={scope === 'all' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => handleScopeChange('all')}
+            >
+              {t('all_workspaces') || 'All Workspaces (Admin)'}
+            </Button>
+          </div>
+
           <div className={styles.searchBox}>
             <input
               type="text"
@@ -222,9 +274,11 @@ const WorkspaceList = () => {
               className={styles.searchInput}
             />
           </div>
-          <button className={styles.createButton} onClick={handleCreateClick}>
-            {t('create_workspace')}
-          </button>
+          {canCreateWorkspace && (
+            <Button onClick={handleCreateClick}>
+              {t('create_workspace')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -232,43 +286,61 @@ const WorkspaceList = () => {
 
       {workspaces.length === 0 ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>📦</div>
-          <p>{t('no_workspaces_found') || "No workspaces found."}</p>
-          <button className={styles.createButton} onClick={handleCreateClick} style={{ marginTop: '1rem' }}>
-            {t('create_first_workspace') || "Create your first workspace"}
-          </button>
+          <div className={styles.emptyIcon}>
+            <LuBox size={48} />
+          </div>
+          {canCreateWorkspace ? (
+            <>
+              <p>{t('no_workspaces_found') || "No workspaces found."}</p>
+              <Button onClick={handleCreateClick}>
+                <LuPlus size={16} />
+                {t('create_first_workspace') || "Create your first workspace"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <p style={{ marginBottom: '0.5rem', fontSize: '1rem', color: '#6b7280' }}>
+                {t('no_workspace_access') || "You don't have access to any workspaces yet."}
+              </p>
+              <p style={{ fontSize: '0.875rem', color: '#9ca3af' }}>
+                {t('wait_for_invitation') || "Wait for an invitation from a Creator or Admin to join a workspace."}
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <>
-          {/* Bulk Actions */}
-          <div className={styles.bulkActions}>
-            <div className={styles.selectActions}>
-              <label className={styles.selectAllLabel}>
-                <input
-                  type="checkbox"
-                  checked={selectAll}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                />
-                {t('select_all')} ({workspaces.length})
-              </label>
+          {/* Bulk Actions - Only show for Creator/Admin */}
+          {canCreateWorkspace && (
+            <div className={styles.bulkActions}>
+              <div className={styles.selectActions}>
+                <label className={styles.selectAllLabel}>
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  />
+                  {t('select_all')} ({workspaces.length})
+                </label>
+                {selectedWorkspaces.size > 0 && (
+                  <span className={styles.selectedInfo}>
+                    {selectedWorkspaces.size} {t('selected')}
+                  </span>
+                )}
+              </div>
               {selectedWorkspaces.size > 0 && (
-                <span className={styles.selectedInfo}>
-                  {selectedWorkspaces.size} {t('selected')}
-                </span>
+                <div className={styles.bulkActionButtons}>
+                  <Button
+                    variant="danger"
+                    onClick={handleDeleteSelected}
+                    loading={deleting}
+                  >
+                    {t('delete_selected')} ({selectedWorkspaces.size})
+                  </Button>
+                </div>
               )}
             </div>
-            {selectedWorkspaces.size > 0 && (
-              <div className={styles.bulkActionButtons}>
-                <button
-                  className={styles.deleteButton}
-                  onClick={handleDeleteSelected}
-                  disabled={deleting}
-                >
-                  {deleting ? t('deleting') : `${t('delete_selected')} (${selectedWorkspaces.size})`}
-                </button>
-              </div>
-            )}
-          </div>
+          )}
 
           <div className={styles.workspaceList}>
             {workspaces.map(workspace => (
@@ -277,33 +349,88 @@ const WorkspaceList = () => {
                 className={`${styles.workspaceCard} ${selectedWorkspaces.has(workspace.id) ? styles.selected : ''}`}
               >
                 <div className={styles.workspaceCardHeader}>
-                  <input
-                    type="checkbox"
-                    checked={selectedWorkspaces.has(workspace.id)}
-                    onChange={(e) => handleWorkspaceSelect(workspace.id, e.target.checked)}
-                    className={styles.workspaceCheckbox}
-                  />
-                  <h3 className={styles.workspaceName}>{workspace.name}</h3>
+                  <div className={styles.headerLeft}>
+                    {canCreateWorkspace && (
+                      <input
+                        type="checkbox"
+                        checked={selectedWorkspaces.has(workspace.id)}
+                        onChange={(e) => handleWorkspaceSelect(workspace.id, e.target.checked)}
+                        className={styles.workspaceCheckbox}
+                      />
+                    )}
+                    <h3 className={styles.workspaceName}>{workspace.name}</h3>
+                  </div>
+
+                  <div className={styles.headerRight}>
+                    {(() => {
+                      const role = workspace.current_user_role || workspace.role;
+                      switch (role) {
+                        case 'owner':
+                          return (
+                            <span className={`${styles.badge} ${styles.badgeOwner}`}>
+                              {t('owner') || 'OWNER'}
+                            </span>
+                          );
+                        case 'collaborator':
+                          return (
+                            <span className={`${styles.badge} ${styles.badgeCollaborator}`}>
+                              {t('collaborator') || 'COLLABORATOR'}
+                            </span>
+                          );
+                        default:
+                          return (
+                            <span className={`${styles.badge} ${styles.badgeMember}`}>
+                              {t('member') || 'MEMBER'}
+                            </span>
+                          );
+                      }
+                    })()}
+
+                    {/* Secondary Actions as Icons in Header */}
+                    {workspace.current_user_role === 'owner' && (
+                      <div className={styles.headerIconActions}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/workspaces/${workspace.id}#members`); }}
+                          title={t('members') || "Members"}
+                        >
+                          <LuUsers size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/workspaces/${workspace.id}`); }}
+                          title={t('settings') || "Settings"}
+                        >
+                          <LuSettings size={16} />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {workspace.description && (
-                  <p className={styles.workspaceDescription}>{workspace.description}</p>
-                )}
-                <div className={styles.workspaceMetadata}>
-                  {workspace.owner_id && (
-                    <span className={styles.ownerInfo}>{t('owner')}: User #{workspace.owner_id}</span>
-                  )}
-                  {workspace.created_at && (
-                    <span className={styles.workspaceDate}>
-                      {t('created')} {new Date(workspace.created_at).toLocaleDateString()}
+
+                <div className={styles.workspaceSubInfo}>
+                  <div className={styles.metaRow}>
+                    <LuUser className={styles.metaIcon} size={14} />
+                    <span className={styles.workspaceOwner}>
+                      {t('owner')}: {workspace.owner?.full_name || workspace.owner?.username || workspace.owner?.email || 'Unknown'}
                     </span>
+                  </div>
+                  {workspace.description && (
+                    <p className={styles.workspaceDescription}>{workspace.description}</p>
                   )}
                 </div>
-                <button
-                  className={styles.openButton}
-                  onClick={() => handleOpenWorkspace(workspace.id)}
-                >
-                  {t('open') || "Open"}
-                </button>
+
+                <div className={styles.cardDivider} />
+
+                <div className={styles.actions}>
+                  <Button
+                    onClick={() => handleOpenWorkspace(workspace.id)}
+                  >
+                    {t('open') || "Open"}
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -359,69 +486,70 @@ const WorkspaceList = () => {
             </div>
           )}
         </>
-      )}
+      )
+      }
 
       {/* Create Workspace Modal */}
-      {showCreateModal && (
-        <div className={styles.modalOverlay} onClick={handleCloseModal}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2>{t('create_workspace')}</h2>
-              <button
-                className={styles.closeButton}
-                onClick={handleCloseModal}
-                aria-label="Close modal"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateWorkspace}>
-              <div className={styles.formGroup}>
-                <label htmlFor="name">{t('workspace_name')}</label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleFormChange}
-                  placeholder={t('enter_workspace_name') || "Enter workspace name"}
-                  required
-                />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label htmlFor="description">{t('description')} ({t('optional') || "optional"})</label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleFormChange}
-                  placeholder={t('enter_workspace_desc') || "Enter workspace description"}
-                />
-              </div>
-
-              <div className={styles.formActions}>
+      {
+        showCreateModal && (
+          <div className={styles.modalOverlay} onClick={handleCloseModal}>
+            <div className={styles.modal} onClick={e => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2>{t('create_workspace')}</h2>
                 <button
-                  type="button"
-                  className={styles.cancelButton}
+                  className={styles.closeButton}
                   onClick={handleCloseModal}
+                  aria-label="Close modal"
                 >
-                  {t('cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className={styles.submitButton}
-                  disabled={creating}
-                >
-                  {creating ? t('creating') : t('create_workspace')}
+                  ×
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleCreateWorkspace}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="name">{t('workspace_name')}</label>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleFormChange}
+                    placeholder={t('enter_workspace_name') || "Enter workspace name"}
+                    required
+                  />
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="description">{t('description')} ({t('optional') || "optional"})</label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleFormChange}
+                    placeholder={t('enter_workspace_desc') || "Enter workspace description"}
+                  />
+                </div>
+
+                <div className={styles.formActions}>
+                  <Button
+                    variant="outline"
+                    onClick={handleCloseModal}
+                  >
+                    {t('cancel')}
+                  </Button>
+                  <Button
+                    type="submit"
+                    loading={creating}
+                  >
+                    {t('create_workspace')}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 

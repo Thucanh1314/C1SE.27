@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import SurveyService from '../../../api/services/survey.service';
 import TemplateService from '../../../api/services/template.service';
@@ -8,20 +8,33 @@ import Loader from '../../../components/common/Loader/Loader';
 import StatusBadge from '../../../components/UI/StatusBadge';
 import SurveyAccessControl from '../../../components/SurveyAccessControl';
 import { useToast } from '../../../contexts/ToastContext';
+import useAutoSave from '../../../hooks/useAutoSave';
+import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
+import { useAuth } from '../../../contexts/AuthContext';
+import { SpinnerIcon, CheckIcon } from '../../../components/Icons';
 import styles from './SurveyEditor.module.scss';
+
+const STEPS = [
+  { id: 'basics', label: '1. Basics', description: 'Title & Template' },
+  { id: 'access', label: '2. Access', description: 'Permissions' },
+  { id: 'review', label: '3. Publish', description: 'Review & Launch' }
+];
 
 const SurveyEditor = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { state: authState } = useAuth(); // Get auth state
   const isEditMode = Boolean(id && id !== 'new');
 
+  // Global State
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
+  const [currentStep, setCurrentStep] = useState('basics');
   const [templates, setTemplates] = useState([]);
   const [workspaces, setWorkspaces] = useState([]);
-  const [, setSurvey] = useState(null);
 
+  // Data State
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -29,7 +42,6 @@ const SurveyEditor = () => {
     start_date: '',
     end_date: '',
     status: 'draft',
-    // Simple Access Control
     access_type: 'public',
     require_login: false,
     allow_anonymous: true,
@@ -37,262 +49,334 @@ const SurveyEditor = () => {
     inviteEmails: ''
   });
 
-  const fetchTemplates = useCallback(async () => {
-    try {
-      const result = await TemplateService.getAll();
-      // TemplateService.getAll() returns { templates: [], pagination: null }
-      const templatesData = result.templates || [];
-      setTemplates(templatesData);
-    } catch (error) {
-      console.error('Error fetching templates:', error);
-      setTemplates([]); // Set empty array on error
-      showToast('Failed to fetch templates', 'error');
-    }
-  }, [showToast]);
+  const [dirty, setDirty] = useState(false);
 
-  const fetchWorkspaces = useCallback(async () => {
-    try {
-      const result = await WorkspaceService.getMyWorkspaces();
-      // WorkspaceService returns { ok: boolean, items: [], total: number }
-      const workspacesData = result.items || [];
-      setWorkspaces(workspacesData);
-    } catch (error) {
-      console.error('Error fetching workspaces:', error);
-      setWorkspaces([]);
-      // Don't show error toast for workspaces since it's optional
-      console.log('Workspaces unavailable - user can still create personal surveys');
-    }
+  // Computed Draft Key
+  const userId = authState?.user?.id || 'guest';
+  const draftKey = `survey_draft:${isEditMode ? id : 'new'}:${userId}`;
+  const didRestoreRef = React.useRef(false); // Ref to prevent duplicate restores
+
+  // Hooks
+  useUnsavedChanges(dirty && !saving);
+  const { lastSaved, isSaving: isAutoSaving, loadSavedData, clearSavedData } = useAutoSave(
+    draftKey,
+    dirty ? formData : null
+  );
+
+  // Load Reference Data
+  useEffect(() => {
+    const loadRefs = async () => {
+      try {
+        const [tplRes, wsRes] = await Promise.all([
+          TemplateService.getAll(),
+          WorkspaceService.getMyWorkspaces()
+        ]);
+        setTemplates(tplRes.templates || []);
+        // WorkspaceService returns { ok: boolean, items: [], total: number } or similar
+        setWorkspaces(wsRes.items || []);
+      } catch (err) {
+        console.error('Ref load error', err);
+      }
+    };
+    loadRefs();
   }, []);
 
-  const fetchSurvey = useCallback(async () => {
-    if (!id || id === 'new') return;
-
-    try {
-      setLoading(true);
-      const data = await SurveyService.getById(id);
-      setSurvey(data);
-      setFormData({
-        title: data.title,
-        description: data.description || '',
-        template_id: data.template_id || '',
-        start_date: data.start_date ? data.start_date.split('T')[0] : '',
-        end_date: data.end_date ? data.end_date.split('T')[0] : '',
-        status: data.status,
-        // Access Control  
-        access_type: data.access_type || 'public',
-        require_login: data.require_login || false,
-        allow_anonymous: data.allow_anonymous !== undefined ? data.allow_anonymous : true,
-        workspace_id: data.workspace_id || null,
-      });
-    } catch (error) {
-      showToast(error.response?.data?.message || 'Failed to fetch survey', 'error');
-      navigate('/surveys');
-    } finally {
-      setLoading(false);
-    }
-  }, [id, navigate, showToast]);
-
+  // Load Survey Data or Draft
   useEffect(() => {
-    fetchTemplates();
-    fetchWorkspaces();
-  }, [fetchTemplates, fetchWorkspaces]);
+    const initData = async () => {
+      if (isEditMode) {
+        setLoading(true);
+        try {
+          const data = await SurveyService.getById(id);
+          setFormData({
+            title: data.title,
+            description: data.description || '',
+            template_id: data.template_id || '',
+            start_date: data.start_date ? data.start_date.split('T')[0] : '',
+            end_date: data.end_date ? data.end_date.split('T')[0] : '',
+            status: data.status,
+            access_type: data.access_type || 'public',
+            require_login: data.require_login || false,
+            allow_anonymous: data.allow_anonymous !== undefined ? data.allow_anonymous : true,
+            workspace_id: data.workspace_id || null,
+          });
+        } catch (e) {
+          showToast('Failed to load survey', 'error');
+          navigate('/surveys');
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // Only attempt restore ONCE per mount
+        if (didRestoreRef.current) return;
 
-  useEffect(() => {
-    if (isEditMode) {
-      fetchSurvey();
+        // Check for local draft using NEW key
+        let draft = loadSavedData();
+
+        // MIGRATION: Check for OLD key if new one is empty
+        if (!draft) {
+          const oldKey = `survey_draft_${id || 'new'}`;
+          const oldRaw = localStorage.getItem(oldKey);
+          if (oldRaw) {
+            try {
+              const parsed = JSON.parse(oldRaw);
+              if (parsed && parsed.data) {
+                draft = { data: parsed.data }; // Adapting old format
+                localStorage.removeItem(oldKey); // Clear old key
+                console.log('Migrated legacy draft');
+              }
+            } catch (e) {
+              console.warn('Failed to migrate draft', e);
+            }
+          }
+        }
+
+        // Check if draft exists and is valid (loadSavedData now returns structured object or null)
+        if (draft && draft.data) {
+          // Verify template still exists if in draft (optional, but good practice)
+          // For now just restore properties
+          setFormData(prev => ({ ...prev, ...draft.data }));
+
+          // Show toast exactly once
+          showToast('Restored unsaved draft', 'info');
+          didRestoreRef.current = true;
+          setDirty(true); // Mark as dirty so it saves again if modified
+        }
+      }
+    };
+    initData();
+  }, [id, isEditMode, navigate, showToast, loadSavedData]);
+
+  // Handlers
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setDirty(true);
+  };
+
+  const handleAccessChange = (newConfig) => {
+    setFormData(prev => ({ ...prev, ...newConfig }));
+    setDirty(true);
+  };
+
+  const validateStep = (step) => {
+    if (step === 'basics') {
+      if (!formData.title.trim()) return 'Title is required';
+      if (!formData.template_id) return 'Template is required';
     }
-  }, [isEditMode, fetchSurvey]);
+    return null;
+  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleStepChange = (stepId) => {
+    setCurrentStep(stepId);
+  };
 
-    if (!formData.title.trim()) {
-      showToast('Survey title is required', 'error');
-      return;
-    }
-
-    if (!formData.template_id) {
-      showToast('Please select a template', 'error');
+  const handleSave = async (publish = false) => {
+    const error = validateStep('basics');
+    if (error) {
+      showToast(error, 'error');
+      setCurrentStep('basics');
       return;
     }
 
     try {
       setSaving(true);
+      const payload = { ...formData };
+      if (publish) payload.status = 'active';
+
+      let result;
       if (isEditMode) {
-        const updatedSurvey = await SurveyService.update(id, formData);
-        setSurvey(updatedSurvey);
-        showToast('Survey updated successfully', 'success');
-      } else {
-        const newSurvey = await SurveyService.create(formData);
-        setSurvey(newSurvey);
+        result = await SurveyService.update(id, payload);
 
-        // Send invites if private survey with emails
-        if (formData.access_type === 'private' && formData.inviteEmails) {
-          try {
-            const emails = formData.inviteEmails
-              .split('\n')
-              .map(e => e.trim())
-              .filter(e => e.length > 0);
-
-            if (emails.length > 0) {
-              await InviteService.createInvites(newSurvey.id, emails);
-              showToast(`Survey created and ${emails.length} invites sent!`, 'success');
-            } else {
-              showToast('Survey created successfully', 'success');
-            }
-          } catch (inviteError) {
-            console.error('Failed to send invites:', inviteError);
-            showToast('Survey created but failed to send some invites', 'warning');
+        // Handle invites for existing survey
+        if (payload.access_type === 'private' && payload.inviteEmails) {
+          const emails = payload.inviteEmails.split(/[\n,]+/).map(e => e.trim()).filter(e => e);
+          if (emails.length > 0) {
+            await InviteService.createInvites(id, emails);
+            // Clear invite field after successful send to prevent double send on next save? 
+            // Or keep it? Backend handles idempotency, but UX wise maybe show "Invites Sent".
+            // For now, let's keep it simple.
+            showToast(`${emails.length} invites processed`, 'success');
           }
-        } else {
-          showToast('Survey created successfully', 'success');
         }
 
-        // Navigate to edit mode to allow access management
-        navigate(`/surveys/${newSurvey.id}/edit`);
+        showToast('Survey updated successfully', 'success');
+      } else {
+        result = await SurveyService.create(payload);
+
+        // Handle invites (New Survey)
+        if (payload.access_type === 'private' && payload.inviteEmails) {
+          const emails = payload.inviteEmails.split(/[\n,]+/).map(e => e.trim()).filter(e => e);
+          if (emails.length) await InviteService.createInvites(result.id, emails);
+        }
+
+        showToast('Survey created successfully', 'success');
+        clearSavedData(); // Clear draft on success
+        navigate(`/surveys/${result.id}/edit`);
+        return;
       }
-    } catch (error) {
-      showToast(error.response?.data?.message || 'Failed to save survey', 'error');
+
+      setFormData(prev => ({ ...prev, status: result.status }));
+      setDirty(false);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Save failed', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const accessControlValue = React.useMemo(() => ({
+    access_type: formData.access_type,
+    require_login: formData.require_login,
+    allow_anonymous: formData.allow_anonymous,
+    workspace_id: formData.workspace_id,
+    inviteEmails: formData.inviteEmails || ''
+  }), [formData.access_type, formData.require_login, formData.allow_anonymous, formData.workspace_id, formData.inviteEmails]);
 
-  if (loading) return <Loader />;
+  if (loading) return <div className={styles.builderLayout}><div style={{ margin: 'auto' }}><Loader /></div></div>;
 
   return (
-    <div className={styles.surveyEditor}>
-      <div className={styles.header}>
-        <button onClick={() => navigate('/surveys')} className={styles.backButton}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          Back to Surveys
-        </button>
+    <div className={styles.builderLayout}>
+      {/* Left Sidebar Steps */}
+      <div className={styles.sidebar}>
+        <div className={styles.sidebarHeader}>
+          <h2>{isEditMode ? 'Edit Survey' : 'New Survey'}</h2>
+          <button onClick={() => { clearSavedData(); navigate('/surveys'); }} className={styles.backLink}>&larr; Back to List</button>
+        </div>
+
+        <nav className={styles.stepNav}>
+          {STEPS.map((step, idx) => (
+            <button
+              key={step.id}
+              className={`${styles.stepItem} ${currentStep === step.id ? styles.active : ''} ${idx < STEPS.findIndex(s => s.id === currentStep) ? styles.completed : ''}`}
+              onClick={() => handleStepChange(step.id)}
+            >
+              <div className={styles.stepIndicator}>
+                {idx < STEPS.findIndex(s => s.id === currentStep) ? <CheckIcon size={14} /> : idx + 1}
+              </div>
+              <div className={styles.stepInfo}>
+                <span className={styles.stepLabel}>{step.label}</span>
+                <span className={styles.stepDesc}>{step.description}</span>
+              </div>
+            </button>
+          ))}
+        </nav>
+
+        <div className={styles.sidebarFooter}>
+          {isAutoSaving && <span className={styles.autoSave}>Saving draft...</span>}
+          {lastSaved && !isAutoSaving && <span className={styles.lastSaved}>Draft saved {lastSaved.toLocaleTimeString()}</span>}
+        </div>
       </div>
 
-      <div className={styles.content}>
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.card}>
-            <div className={styles.cardHeader}>
-              <h2>{isEditMode ? 'Edit Survey' : 'Create New Survey'}</h2>
-              {isEditMode && <StatusBadge status={formData.status} />}
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Survey Title *</label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                placeholder="Enter survey title"
-                required
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Description</label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Enter survey description"
-                rows={4}
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Select Template *</label>
-              <select
-                name="template_id"
-                value={formData.template_id}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Choose a template...</option>
-                {templates.map(template => (
-                  <option key={template.id} value={template.id}>
-                    {template.title}
-                  </option>
-                ))}
-              </select>
-              {templates.length === 0 && (
-                <p className={styles.hint}>No templates available. Create a template first.</p>
-              )}
-            </div>
-
-            <div className={styles.formRow}>
+      {/* Main Content Area */}
+      <main className={styles.mainContent}>
+        {/* Render Step Content */}
+        <div className={styles.stepContainer}>
+          {currentStep === 'basics' && (
+            <div className={styles.fsSection}>
+              <h3>Basic Information</h3>
               <div className={styles.formGroup}>
-                <label>Start Date</label>
+                <label>Survey Title <span className={styles.req}>*</span></label>
                 <input
-                  type="date"
-                  name="start_date"
-                  value={formData.start_date}
-                  onChange={handleChange}
+                  type="text" name="title"
+                  value={formData.title} onChange={handleChange}
+                  placeholder="e.g. Student Satisfaction Survey 2024"
+                  autoFocus
                 />
               </div>
-
               <div className={styles.formGroup}>
-                <label>End Date</label>
-                <input
-                  type="date"
-                  name="end_date"
-                  value={formData.end_date}
-                  onChange={handleChange}
-                  min={formData.start_date}
+                <label>Description</label>
+                <textarea
+                  name="description"
+                  value={formData.description} onChange={handleChange}
+                  rows={3}
                 />
               </div>
+              <div className={styles.formGroup}>
+                <label>Template <span className={styles.req}>*</span></label>
+                <select name="template_id" value={formData.template_id} onChange={handleChange} disabled={isEditMode}>
+                  <option value="">Select a template...</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </select>
+                {isEditMode && <p className={styles.hint}>Template cannot be changed after creation.</p>}
+              </div>
+              <div className={styles.row}>
+                <div className={styles.formGroup}>
+                  <label>Start Date</label>
+                  <input type="date" name="start_date" value={formData.start_date} onChange={handleChange} />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>End Date</label>
+                  <input type="date" name="end_date" value={formData.end_date} onChange={handleChange} min={formData.start_date} />
+                </div>
+              </div>
             </div>
+          )}
 
-            {/* Survey Access Control - Integrated */}
-            <div className={styles.accessControlSection}>
-              <h3>🔐 Survey Access Control</h3>
-              <p>Configure who can access and respond to your survey</p>
-
+          {currentStep === 'access' && (
+            <div className={styles.fsSection}>
               <SurveyAccessControl
-                surveyId={isEditMode ? id : null}
-                value={{
-                  access_type: formData.access_type,
-                  require_login: formData.require_login,
-                  allow_anonymous: formData.allow_anonymous,
-                  workspace_id: formData.workspace_id
-                }}
-                onChange={(accessConfig) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    ...accessConfig
-                  }));
-                }}
+                surveyId={id === 'new' ? null : id}
+                value={accessControlValue}
+                onChange={handleAccessChange}
                 availableWorkspaces={workspaces}
-                compact={true}
               />
             </div>
+          )}
 
-            <div className={styles.actions}>
-              <button
-                type="button"
-                onClick={() => navigate('/surveys')}
-                className={styles.cancelButton}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className={styles.saveButton}
-              >
-                {saving ? 'Saving...' : isEditMode ? 'Update Survey' : 'Create Survey'}
-              </button>
+          {currentStep === 'review' && (
+            <div className={styles.fsSection}>
+              <h3>Review & Publish</h3>
+              <div className={styles.reviewCard}>
+                <div className={styles.reviewItem}>
+                  <label>Status</label>
+                  <StatusBadge status={formData.status} />
+                </div>
+                <div className={styles.reviewItem}>
+                  <label>Title</label>
+                  <p>{formData.title}</p>
+                </div>
+                <div className={styles.reviewItem}>
+                  <label>Access</label>
+                  <p>{formData.access_type.toUpperCase()}</p>
+                </div>
+              </div>
+
+              <div className={styles.publishActions}>
+                <p>Ready to launch your survey?</p>
+                <button
+                  className={styles.publishBtn}
+                  onClick={() => handleSave(true)}
+                  disabled={saving || !validateStep('basics')}
+                >
+                  {saving ? <SpinnerIcon /> : 'Save & Publish'}
+                </button>
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* Sticky Action Footer */}
+        <footer className={styles.actionBar}>
+          <span className={styles.statusMsg}>
+            {dirty ? 'Unsaved changes' : 'All changes saved'}
+          </span>
+          <div className={styles.actionButtons}>
+            {currentStep !== 'basics' && (
+              <button className={styles.secondaryBtn} onClick={() => setCurrentStep(prev => STEPS[STEPS.findIndex(s => s.id === prev) - 1].id)}>Previous</button>
+            )}
+            {currentStep !== 'review' ? (
+              <button className={styles.primaryBtn} onClick={() => setCurrentStep(prev => STEPS[STEPS.findIndex(s => s.id === prev) + 1].id)}>Next Step</button>
+            ) : (
+              <button className={styles.primaryBtn} onClick={() => handleSave(false)} disabled={saving}>
+                {saving ? <SpinnerIcon /> : isEditMode ? 'Save Changes' : 'Create Survey'}
+              </button>
+            )}
           </div>
-        </form>
-      </div>
+        </footer>
+      </main>
     </div>
   );
 };

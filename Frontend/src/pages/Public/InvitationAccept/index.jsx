@@ -1,114 +1,150 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import CollectorService from '../../../api/services/collector.service';
+import InviteService from '../../../api/services/invite.service';
+import Loader from '../../../components/common/Loader/Loader';
+import { useToast } from '../../../contexts/ToastContext';
 import styles from './InvitationAccept.module.scss';
+import { useAuth } from '../../../contexts/AuthContext';
 
-/**
- * Invitation Acceptance Page
- * Allows users to accept survey invitations
- */
 const InvitationAccept = () => {
-  const { inviteToken } = useParams();
+  const { token } = useParams();
   const navigate = useNavigate();
-  
+  const { showToast } = useToast();
+  const { state } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = state;
+
   const [loading, setLoading] = useState(true);
+  const [inviteData, setInviteData] = useState(null);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
-  const [invitationData, setInvitationData] = useState(null);
+  const [accepting, setAccepting] = useState(false);
 
   useEffect(() => {
-    acceptInvitation();
-  }, [inviteToken]);
+    console.log('InvitationAccept - Auth state:', { isAuthenticated, authLoading, token });
+    
+    if (authLoading) {
+      console.log('Still loading auth state...');
+      return;
+    }
 
-  const acceptInvitation = async () => {
-    try {
-      setLoading(true);
-      const response = await CollectorService.acceptInvitation(inviteToken);
-
-      if (response.ok) {
-        setSuccess(true);
-        setInvitationData(response.data);
-
-        // Redirect to survey after 2 seconds
-        setTimeout(() => {
-          if (response.data.survey_id && response.data.collector_token) {
-            navigate(`/survey/${response.data.collector_token}`);
-          } else {
-            navigate('/');
+    const validateToken = async () => {
+      try {
+        console.log('Validating token:', token);
+        const data = await InviteService.validateToken(token);
+        console.log('Validation result:', data);
+        
+        if (data.valid) {
+          setInviteData(data);
+          
+          // Check if survey requires login
+          if (data.survey?.require_login && !isAuthenticated) {
+            console.log('Survey requires login, redirecting...');
+            const returnUrl = encodeURIComponent(`/public/invite/${token}`);
+            navigate(`/login?redirect=${returnUrl}`);
+            return;
           }
-        }, 2000);
-      } else {
-        setError(response.message || 'Failed to accept invitation');
+        } else {
+          setError('Invalid invitation token');
+        }
+      } catch (err) {
+        console.error('Token validation error:', err);
+        setError(err.response?.data?.message || 'Failed to validate invitation');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error accepting invitation:', error);
-      setError(error.message || 'An error occurred while accepting the invitation');
+    };
+
+    if (token) validateToken();
+  }, [token, isAuthenticated, authLoading, navigate]);
+
+  const handleAccept = async () => {
+    try {
+      setAccepting(true);
+      console.log('Accepting invitation with token:', token);
+      
+      const result = await InviteService.acceptInvite(token);
+      console.log('Accept result:', result);
+
+      showToast('Invitation accepted! Redirecting...', 'success');
+
+      // Try multiple fallback options for redirect
+      let redirectUrl = result.redirect_url || 
+                       result.survey_url ||
+                       (inviteData?.survey?.id ? `/surveys/${inviteData.survey.id}/respond` : null);
+                       
+      console.log('Redirect URL:', redirectUrl);
+
+      if (redirectUrl) {
+        // Determine if it's internal route or external
+        if (redirectUrl.startsWith('http')) {
+          window.location.href = redirectUrl;
+        } else {
+          navigate(redirectUrl);
+        }
+      } else {
+        // Fallback: redirect to dashboard or surveys page  
+        console.log('No redirect URL, using fallback');
+        if (isAuthenticated) {
+          navigate('/surveys');  // Authenticated users go to surveys list
+        } else {
+          navigate('/login');    // Non-authenticated users go to login
+        }
+        showToast('Invitation accepted successfully!', 'success');
+      }
+    } catch (err) {
+      console.error('Accept invitation error:', err);
+      showToast(err.response?.data?.message || 'Failed to accept invitation', 'error');
     } finally {
-      setLoading(false);
+      setAccepting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.content}>
-          <div className={styles.loader}></div>
-          <p>Processing your invitation...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className={styles.container}><Loader /></div>;
 
   if (error) {
     return (
       <div className={styles.container}>
-        <div className={styles.errorContent}>
-          <div className={styles.errorIcon}>❌</div>
-          <h2>Invalid Invitation</h2>
+        <div className={styles.card}>
+          <div className={styles.errorIcon}>⚠️</div>
+          <h2>Invitation Error</h2>
           <p>{error}</p>
-          <div className={styles.actions}>
-            <button className={styles.button} onClick={() => navigate('/')}>
-              Go to Home
-            </button>
-          </div>
+          <button onClick={() => navigate('/')} className={styles.secondaryBtn}>Go Home</button>
         </div>
       </div>
     );
   }
 
-  if (success) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.successContent}>
-          <div className={styles.successIcon}>✓</div>
-          <h2>Invitation Accepted!</h2>
-          <p>You have successfully accepted the survey invitation.</p>
-          {invitationData?.survey_name && (
-            <p className={styles.surveyName}>
-              Survey: <strong>{invitationData.survey_name}</strong>
-            </p>
-          )}
-          <p className={styles.redirect}>
-            Redirecting you to the survey in a moment...
-          </p>
-          <div className={styles.actions}>
-            <button
-              className={styles.button}
-              onClick={() => {
-                if (invitationData?.survey_id && invitationData?.collector_token) {
-                  navigate(`/survey/${invitationData.collector_token}`);
-                }
-              }}
-            >
-              Go to Survey Now
-            </button>
+  return (
+    <div className={styles.container}>
+      <div className={styles.card}>
+        <div className={styles.header}>
+          <h1>You're Invited!</h1>
+          <p>You have been invited to participate in a survey.</p>
+        </div>
+
+        {inviteData && inviteData.survey && (
+          <div className={styles.surveyInfo}>
+            <h3>{inviteData.survey.title}</h3>
+            {inviteData.survey.description && (
+              <p className={styles.description}>{inviteData.survey.description}</p>
+            )}
+            <div className={styles.meta}>
+              <span>Invited Email: <strong>{inviteData.email}</strong></span>
+            </div>
           </div>
+        )}
+
+        <div className={styles.actions}>
+          <button
+            className={styles.acceptBtn}
+            onClick={handleAccept}
+            disabled={accepting}
+          >
+            {accepting ? 'Starting Survey...' : 'Accept & Start Survey'}
+          </button>
         </div>
       </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 };
 
 export default InvitationAccept;

@@ -18,9 +18,10 @@ module.exports = (sequelize, DataTypes) => {
       },
       action: {
         type: DataTypes.ENUM(
-          'created', 'joined', 'left', 'survey_created', 
+          'created', 'joined', 'left', 'survey_created',
           'survey_updated', 'survey_deleted', 'member_invited', 'member_removed',
-          'workspace_updated', 'workspace_deleted', 'invitation_sent', 'invitation_resent', 'invitation_cancelled'
+          'workspace_updated', 'workspace_deleted', 'invitation_sent', 'invitation_resent', 'invitation_cancelled',
+          'member_role_requested', 'member_role_updated', 'analysis_finished'
         ),
         allowNull: false,
       },

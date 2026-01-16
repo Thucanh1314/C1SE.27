@@ -289,14 +289,24 @@ class LLMController {
         customQuestions,
         shareSettings,
         targetAudience,
+        workspaceId,  // Add workspaceId
         startDate,
-        endDate
+        endDate,
+        quickInvite  // Add quickInvite
       } = req.body;
 
       if (!title || !selectedQuestions || selectedQuestions.length === 0) {
         return res.status(400).json({
           success: false,
           message: 'Title and at least one question are required'
+        });
+      }
+
+      // Validate workspace requirement for internal surveys
+      if (targetAudience === 'internal' && !workspaceId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Workspace ID is required for internal surveys'
         });
       }
 
@@ -309,14 +319,22 @@ class LLMController {
           customQuestions: customQuestions || [],
           shareSettings,
           targetAudience,
+          workspaceId,  // Pass workspaceId
           startDate,
-          endDate
+          endDate,
+          quickInvite  // Pass quickInvite
         }
       );
 
+      // Customize message based on invitation results
+      let message = 'Survey created successfully';
+      if (result.invitations && result.invitations.sent > 0) {
+        message = `Survey created and ${result.invitations.sent} invitation${result.invitations.sent > 1 ? 's' : ''} sent!`;
+      }
+
       res.status(201).json({
         success: true,
-        message: 'Survey created successfully',
+        message,
         data: result
       });
     } catch (error) {

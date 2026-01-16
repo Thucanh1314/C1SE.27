@@ -41,7 +41,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       status: {
-        type: DataTypes.ENUM('draft', 'active', 'closed', 'analyzed'),
+        type: DataTypes.ENUM('draft', 'active', 'closed', 'analyzed', 'archived'),
         defaultValue: 'draft',
       },
       // Simple Survey Access Control - 4 main types
@@ -82,6 +82,30 @@ module.exports = (sequelize, DataTypes) => {
       },
     },
     {
+      hooks: {
+        beforeUpdate: async (survey, options) => {
+          // Fields that define structure/container
+          const structuralFields = ['template_id', 'workspace_id', 'access_type'];
+          const changedStructuralFields = structuralFields.filter(field => survey.changed(field));
+
+          if (changedStructuralFields.length > 0) {
+            // Check Lock Conditions
+            // 1. Status Check
+            if (survey.status !== 'draft') {
+              throw new Error(`Cannot update ${changedStructuralFields.join(', ')} because survey is not in draft status.`);
+            }
+
+            // 2. Response Check
+            const responseCount = await sequelize.models.SurveyResponse.count({
+              where: { survey_id: survey.id }
+            });
+
+            if (responseCount > 0) {
+              throw new Error(`Cannot update ${changedStructuralFields.join(', ')} because survey already has responses.`);
+            }
+          }
+        }
+      },
       tableName: 'surveys',
       timestamps: true,
       createdAt: 'created_at',

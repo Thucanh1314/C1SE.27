@@ -57,11 +57,12 @@ const CollectorList = () => {
       try {
         const surveyData = await SurveyService.getAll();
         const surveys = surveyData.surveys || [];
-        const activeSurveys = surveys.filter(s => s.status === 'active');
-        setSurveys(activeSurveys);
+        // Only exclude Draft surveys from the collector list
+        const visibleSurveys = surveys.filter(s => s.status !== 'draft');
+        setSurveys(surveys.filter(s => s.status === 'active')); // For dropdown, keep only active? Or maybe visible too? Let's use visible for list.
 
-        // Then fetch collectors for all surveys
-        await fetchCollectors(activeSurveys);
+        // Use visibleSurveys for fetching collectors
+        await fetchCollectors(visibleSurveys);
       } catch (error) {
         showToast('Failed to initialize page', 'error');
         setLoading(false);
@@ -75,9 +76,11 @@ const CollectorList = () => {
       try {
         const surveyData = await SurveyService.getAll();
         const surveys = surveyData.surveys || [];
-        const activeSurveys = surveys.filter(s => s.status === 'active');
-        setSurveys(activeSurveys);
-        await fetchCollectors(activeSurveys);
+        const visibleSurveys = surveys.filter(s => s.status !== 'draft');
+        // Update state for dropdown if needed, though usually we might want to keep it strictly active
+        // But let's keep consistency with the initial load
+        setSurveys(surveys.filter(s => s.status === 'active'));
+        await fetchCollectors(visibleSurveys);
       } catch (error) {
         console.error('Auto-refresh failed:', error);
       }
@@ -137,10 +140,19 @@ const CollectorList = () => {
     showToast('Link copied to clipboard', 'success');
   };
 
-  const isExpired = (collector) => {
-    // Check if survey has ended
-    if (!collector.survey?.end_date) return false;
-    return new Date(collector.survey.end_date) < new Date();
+  const getCollectorStatus = (collector) => {
+    // 1. Check survey status first
+    if (collector.survey?.status === 'closed' || collector.survey?.status === 'analyzed') {
+      return { label: 'Closed', class: styles.expired };
+    }
+
+    // 2. Check expiration
+    if (collector.survey?.end_date && new Date(collector.survey.end_date) < new Date()) {
+      return { label: 'Expired', class: styles.expired };
+    }
+
+    // 3. Active
+    return { label: 'Active', class: styles.active };
   };
 
   const totalPages = Math.ceil(collectors.length / itemsPerPage);
@@ -170,7 +182,12 @@ const CollectorList = () => {
 
       {collectors.length === 0 ? (
         <div className={styles.emptyState}>
-          <div className={styles.emptyIcon}>🔗</div>
+          <div className={styles.emptyIcon}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+          </div>
           <h3>No collectors found</h3>
           <p>Generate a collector to create a public survey link</p>
           <button
@@ -209,8 +226,8 @@ const CollectorList = () => {
                       </code>
                     </td>
                     <td>
-                      <span className={`${styles.statusBadge} ${isExpired(collector) ? styles.expired : styles.active}`}>
-                        {isExpired(collector) ? 'Expired' : 'Active'}
+                      <span className={`${styles.statusBadge} ${getCollectorStatus(collector).class}`}>
+                        {getCollectorStatus(collector).label}
                       </span>
                     </td>
                     <td>{new Date(collector.created_at).toLocaleDateString()}</td>

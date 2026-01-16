@@ -50,7 +50,7 @@ const SurveyDetail = () => {
   }, [id, navigate, showToast]);
 
   const handleRespond = (collectorToken) => {
-    window.open(`/public/responses/${collectorToken}`, '_blank');
+    window.open(`/collector/${collectorToken}`, '_blank');
   };
 
   if (loading) return <Loader />;

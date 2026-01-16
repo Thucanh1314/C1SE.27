@@ -3,7 +3,9 @@ const express = require('express');
 const router = express.Router();
 const surveyController = require('../controller/survey.controller');
 const surveyAccessController = require('../controller/surveyAccess.controller');
+const feedbackController = require('../controller/feedback.controller');
 const { authenticate, isTeacherOrAdmin } = require('../../../middleware/auth.middleware');
+const { requireCreatorRole } = require('../../../middleware/roleCreatorCheck.middleware');
 
 /**
  * @route   GET /api/surveys
@@ -18,6 +20,13 @@ router.get('/', authenticate, surveyController.getAllSurveys);
  * @access  Private
  */
 router.get('/my-accessible', authenticate, surveyAccessController.getMyAccessibleSurveys);
+
+/**
+ * @route   GET /api/surveys/assigned
+ * @desc    Get surveys assigned to the current user (pending/completed)
+ * @access  Private
+ */
+router.get('/assigned', authenticate, surveyController.getAssignedSurveys);
 
 /**
  * @route   GET /api/surveys/:id
@@ -36,51 +45,30 @@ router.get('/:id/stats', authenticate, surveyController.getSurveyStats);
 /**
  * @route   POST /api/surveys
  * @desc    Create new survey
- * @access  Private (Creator/Admin only)
+ * @access  Private (Creator only - requires system role 'creator')
  */
-router.post('/', authenticate, isTeacherOrAdmin, surveyController.createSurvey);
+router.post('/', authenticate, requireCreatorRole, surveyController.createSurvey);
 
-/**
- * @route   PUT /api/surveys/:id
- * @desc    Update survey
- * @access  Private (Owner/Admin only)
- */
-router.put('/:id', authenticate, isTeacherOrAdmin, surveyController.updateSurvey);
+// Update survey (Creator only)
+router.put('/:id', authenticate, requireCreatorRole, surveyController.updateSurvey);
 
-/**
- * @route   DELETE /api/surveys/bulk
- * @desc    Bulk delete surveys
- * @access  Private (Owner/Admin only)
- */
-router.delete('/bulk', authenticate, isTeacherOrAdmin, surveyController.deleteSurveys);
+// Bulk delete surveys (Creator only)
+router.delete('/bulk', authenticate, requireCreatorRole, surveyController.deleteSurveys);
 
-/**
- * @route   DELETE /api/surveys/:id
- * @desc    Delete survey
- * @access  Private (Owner/Admin only)
- */
-router.delete('/:id', authenticate, isTeacherOrAdmin, surveyController.deleteSurvey);
+// Delete survey (Creator only)
+router.delete('/:id', authenticate, requireCreatorRole, surveyController.deleteSurvey);
 
-/**
- * @route   POST /api/surveys/:id/publish
- * @desc    Publish survey (draft -> active)
- * @access  Private (Owner/Admin only)
- */
-router.post('/:id/publish', authenticate, isTeacherOrAdmin, surveyController.publishSurvey);
+// Publish survey (Creator only)
+router.post('/:id/publish', authenticate, requireCreatorRole, surveyController.publishSurvey);
 
-/**
- * @route   POST /api/surveys/:id/close
- * @desc    Close survey (active -> closed)
- * @access  Private (Owner/Admin only)
- */
-router.post('/:id/close', authenticate, isTeacherOrAdmin, surveyController.closeSurvey);
+// Close survey (Creator only)
+router.post('/:id/close', authenticate, requireCreatorRole, surveyController.closeSurvey);
 
-/**
- * @route   PATCH /api/surveys/:id/status
- * @desc    Update survey status
- * @access  Private (Owner/Admin only)
- */
-router.patch('/:id/status', authenticate, isTeacherOrAdmin, surveyController.updateSurveyStatus);
+// Update survey status (Creator only)
+router.patch('/:id/status', authenticate, requireCreatorRole, surveyController.updateSurveyStatus);
+
+// Restore archived survey (Creator only)
+router.patch('/:id/restore', authenticate, requireCreatorRole, surveyController.restoreSurvey);
 
 // Survey Access Routes
 
@@ -89,21 +77,21 @@ router.patch('/:id/status', authenticate, isTeacherOrAdmin, surveyController.upd
  * @desc    Grant access to a survey
  * @access  Private (Owner/Admin only)
  */
-router.post('/:id/access', authenticate, isTeacherOrAdmin, surveyAccessController.grantAccess);
+router.post('/:id/access', authenticate, surveyAccessController.grantAccess);
 
 /**
  * @route   GET /api/surveys/:id/access
  * @desc    Get access grants for a survey
  * @access  Private (Owner/Admin only)
  */
-router.get('/:id/access', authenticate, isTeacherOrAdmin, surveyAccessController.getSurveyAccessGrants);
+router.get('/:id/access', authenticate, surveyAccessController.getSurveyAccessGrants);
 
 /**
  * @route   DELETE /api/surveys/:id/access/:userId
  * @desc    Revoke access to a survey
  * @access  Private (Owner/Admin only)
  */
-router.delete('/:id/access/:userId', authenticate, isTeacherOrAdmin, surveyAccessController.revokeAccess);
+router.delete('/:id/access/:userId', authenticate, surveyAccessController.revokeAccess);
 
 /**
  * @route   GET /api/surveys/:id/my-access
@@ -144,10 +132,52 @@ router.get('/:id/invites/stats', authenticate, surveyInviteController.getInviteS
 router.get('/invites/:token/validate', surveyInviteController.validateInvite);
 
 /**
+ * @route   POST /api/modules/invites/:token/accept
+ * @desc    Accept invite token (public)
+ * @access  Public
+ */
+router.post('/invites/:token/accept', surveyInviteController.acceptInvite);
+
+/**
  * @route   DELETE /api/modules/invites/:id
  * @desc    Revoke invite
  * @access  Private (Owner only)
  */
 router.delete('/invites/:id', authenticate, surveyInviteController.revokeInvite);
+
+// Feedback Routes
+
+/**
+ * @route   POST /api/modules/surveys/:surveyId/feedback
+ * @desc    Submit feedback for a survey (Public or Internal)
+ * @access  Public (Authenticated for Internal source)
+ */
+// Note: We use :surveyId here to match the controller expectation, but the main router uses :id.
+// Express router merges params if configured, but let's stick to standard. 
+// If this router is mounted at /api/modules/surveys, then path is /:id/feedback
+router.post('/:surveyId/feedback', async (req, res, next) => {
+    // Optional Authentication check if internal
+    if (req.body.source === 'internal') {
+        return authenticate(req, res, next);
+    }
+    next();
+}, feedbackController.submitFeedback);
+
+/**
+ * @route   GET /api/modules/surveys/:surveyId/feedback/stats
+ * @desc    Get feedback statistics
+ * @access  Private (Owner/Admin only)
+ */
+router.get('/:surveyId/feedback/stats', authenticate, feedbackController.getFeedbackStats);
+
+/**
+ * @route   POST /api/modules/surveys/feedback/reminders
+ * @desc    Trigger feedback reminders (Admin only)
+ * @access  Private (Admin only)
+ */
+router.post('/feedback/reminders', authenticate, (req, res, next) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ message: 'Forbidden' });
+    next();
+}, feedbackController.triggerReminders);
 
 module.exports = router;

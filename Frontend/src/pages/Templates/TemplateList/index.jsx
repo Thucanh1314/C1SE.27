@@ -13,7 +13,7 @@ const TemplateList = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { state: { user } } = useAuth();
-  const { t } = useLanguage();
+  const { tSafe } = useLanguage();
 
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,16 +25,21 @@ const TemplateList = () => {
   const [templateToDelete, setTemplateToDelete] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
+  // Scope State: 'my' (default) or 'all'
+  const [scope, setScope] = useState(() => {
+    return localStorage.getItem('scope.templates') || 'my';
+  });
 
   const itemsPerPage = 10;
 
-  const fetchTemplates = useCallback(async () => {
+  const fetchTemplates = useCallback(async (currentScope = 'my') => {
     try {
       setLoading(true);
       const { templates: data, pagination } = await TemplateService.getAll({
         page: currentPage,
         limit: itemsPerPage,
-        search: searchTerm
+        search: searchTerm,
+        scope: currentScope
       });
 
       setTemplates(Array.isArray(data) ? data : []);
@@ -50,44 +55,53 @@ const TemplateList = () => {
     } catch (error) {
       console.error('Error fetching templates:', error);
       setTemplates([]);
-      showToast(error.response?.data?.message || 'Failed to fetch templates', 'error');
+      showToast(error.response?.data?.message || tSafe('failed_fetch_templates', 'Failed to fetch templates'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchTerm, showToast]);
+  }, [currentPage, searchTerm, showToast, tSafe]);
 
   useEffect(() => {
-    fetchTemplates();
-  }, [fetchTemplates]);
+    fetchTemplates(scope);
+  }, [fetchTemplates, scope]); // Fetch when scope changes
 
   // Reset selection when page or search changes
   useEffect(() => {
     setSelectedIds([]);
-  }, [currentPage, searchTerm]);
+  }, [currentPage, searchTerm, scope]);
+
+  // Handle Scope Change
+  const handleScopeChange = (newScope) => {
+    if (newScope === scope) return;
+    setScope(newScope);
+    setCurrentPage(1); // Reset to page 1
+    localStorage.setItem('scope.templates', newScope);
+    // fetchTemplates() will be triggered by useEffect
+  };
 
   const handleDelete = async () => {
     if (!templateToDelete) return;
 
     try {
       await TemplateService.delete(templateToDelete.id);
-      showToast('Template deleted successfully', 'success');
+      showToast(tSafe('template_deleted_success', 'Template deleted successfully'), 'success');
       setShowDeleteModal(false);
       setTemplateToDelete(null);
-      fetchTemplates();
+      fetchTemplates(scope);
     } catch (error) {
-      showToast(error.response?.data?.message || 'Failed to delete template', 'error');
+      showToast(error.response?.data?.message || tSafe('failed_delete_template', 'Failed to delete template'), 'error');
     }
   };
 
   const handleBulkDelete = async () => {
     try {
       await TemplateService.deleteMany(selectedIds);
-      showToast(`${selectedIds.length} templates deleted successfully`, 'success');
+      showToast(tSafe('templates_deleted_success', { count: selectedIds.length }) || `${selectedIds.length} templates deleted successfully`, 'success');
       setShowBulkDeleteModal(false);
       setSelectedIds([]);
-      fetchTemplates();
+      fetchTemplates(scope);
     } catch (error) {
-      showToast(error.response?.data?.message || 'Failed to delete templates', 'error');
+      showToast(error.response?.data?.message || tSafe('failed_delete_templates', 'Failed to delete templates'), 'error');
     }
   };
 
@@ -121,23 +135,78 @@ const TemplateList = () => {
 
   if (loading && templates.length === 0) return <Loader />;
 
+  const isAdmin = user && user.role === 'admin';
+
   return (
     <div className={styles.templateList}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>{t('survey_templates')}</h1>
-          <p className={styles.subtitle}>{t('manage_templates_desc') || 'Create and manage reusable survey templates'}</p>
+          <h1 className={styles.title}>
+            {tSafe('survey_templates', 'Survey Templates')}
+            <span style={{ fontSize: '0.6em', color: '#6b7280', marginLeft: '0.5rem', fontWeight: 'normal' }}>
+              — {scope === 'my' ? tSafe('my_templates', 'My Templates') : tSafe('all_templates', 'All Templates')}
+            </span>
+          </h1>
+          <p className={styles.subtitle}>{tSafe('manage_templates_desc', 'Create and manage reusable survey templates')}</p>
         </div>
-        <button
-          className={styles.createButton}
-          onClick={() => navigate('/templates/new')}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          {t('create_template') || 'Create Template'}
-        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {/* Scope Tabs - Only show if Admin */}
+          {isAdmin && (
+            <div className={styles.scopeTabs} style={{
+              display: 'flex',
+              backgroundColor: '#f3f4f6',
+              padding: '4px',
+              borderRadius: '8px',
+            }}>
+              <button
+                onClick={() => handleScopeChange('my')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: scope === 'my' ? 'white' : 'transparent',
+                  color: scope === 'my' ? '#111827' : '#6b7280',
+                  boxShadow: scope === 'my' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  fontWeight: 500,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {tSafe('my_templates', 'My Templates')}
+              </button>
+              <button
+                onClick={() => handleScopeChange('all')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: scope === 'all' ? 'white' : 'transparent',
+                  color: scope === 'all' ? '#111827' : '#6b7280',
+                  boxShadow: scope === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  fontWeight: 500,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {tSafe('all_templates', 'All Templates (Admin)')}
+              </button>
+            </div>
+          )}
+
+          <button
+            className={styles.createButton}
+            onClick={() => navigate('/templates/new')}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            {tSafe('create_template', 'Create Template')}
+          </button>
+        </div>
       </div>
 
       <div className={styles.filters}>
@@ -148,7 +217,7 @@ const TemplateList = () => {
           </svg>
           <input
             type="text"
-            placeholder={t('search_templates')}
+            placeholder={tSafe('search_templates', 'Search templates...')}
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -180,12 +249,12 @@ const TemplateList = () => {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
-              {t('delete_selected')} ({selectedIds.length})
+              {tSafe('delete_selected', 'Delete Selected')} ({selectedIds.length})
             </button>
           )}
 
           <span className={styles.resultCount}>
-            {totalItems} {totalItems === 1 ? t('template') : t('templates')} {t('found')}
+            {totalItems} {totalItems === 1 ? tSafe('template', 'template') : tSafe('templates', 'templates')} {tSafe('found', 'found')}
           </span>
         </div>
       </div>
@@ -207,20 +276,20 @@ const TemplateList = () => {
           style={{ width: '1.25rem', height: '1.25rem', cursor: 'pointer', marginRight: '0.75rem' }}
         />
         <span style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>
-          {t('select_all_my_templates') || 'Select All (My Templates)'}
+          {tSafe('select_all_my_templates', 'Select All (My Templates)')}
         </span>
       </div>
 
       {templates.length === 0 ? (
         <div className={styles.emptyState}>
           <div className={styles.emptyIcon}>📋</div>
-          <h3>{t('no_templates_found')}</h3>
-          <p>{t('create_first_template_desc') || 'Create your first survey template to get started'}</p>
+          <h3>{tSafe('no_templates_found', 'No templates found')}</h3>
+          <p>{tSafe('create_first_template_desc', 'Create your first survey template to get started')}</p>
           <button
             className={styles.emptyButton}
             onClick={() => navigate('/templates/new')}
           >
-            {t('create_template') || 'Create Template'}
+            {tSafe('create_template', 'Create Template')}
           </button>
         </div>
       ) : (
@@ -247,7 +316,7 @@ const TemplateList = () => {
                       <button
                         onClick={() => navigate(`/templates/${template.id}/edit`)}
                         className={styles.editButton}
-                        title={t('edit')}
+                        title={tSafe('edit', 'Edit')}
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -258,7 +327,7 @@ const TemplateList = () => {
                         <button
                           onClick={() => openDeleteModal(template)}
                           className={styles.deleteButton}
-                          title={t('delete')}
+                          title={tSafe('delete', 'Delete')}
                         >
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -269,12 +338,12 @@ const TemplateList = () => {
                   </div>
 
                   <p className={styles.cardDescription} style={{ paddingLeft: isDeletable ? '2rem' : '0' }}>
-                    {template.description || t('no_description')}
+                    {template.description || tSafe('no_description', 'No description')}
                   </p>
 
                   <div className={styles.cardFooter}>
                     <span className={styles.questionCount}>
-                      📝 {template.question_count || 0} {t('questions')}
+                      📝 {template.questionCount || 0} {template.questionCount === 1 ? tSafe('question', 'Question') : tSafe('questions', 'Questions')}
                     </span>
                     <span className={styles.createdDate}>
                       {new Date(template.created_at).toLocaleDateString()}
@@ -289,7 +358,9 @@ const TemplateList = () => {
             <div className={styles.paginationWrapper}>
               <Pagination
                 currentPage={currentPage}
-                totalPages={totalPages}
+                totalPages={Number(totalPages) || 1}
+                totalItems={Number(totalItems) || 0}
+                itemsPerPage={itemsPerPage}
                 onPageChange={setCurrentPage}
               />
             </div>
@@ -304,9 +375,9 @@ const TemplateList = () => {
           setTemplateToDelete(null);
         }}
         onConfirm={handleDelete}
-        title={t('delete_template') || "Delete Template"}
-        message={t('delete_template_confirm') || `Are you sure you want to delete "${templateToDelete?.title}"? This action cannot be undone and will delete all associated questions.`}
-        confirmText={t('delete')}
+        title={tSafe('delete_template', 'Delete Template')}
+        message={tSafe('delete_template_confirm', `Are you sure you want to delete "${templateToDelete?.title}"?`)}
+        confirmText={tSafe('delete', 'Delete')}
         confirmColor="danger"
       />
 
@@ -314,13 +385,13 @@ const TemplateList = () => {
         isOpen={showBulkDeleteModal}
         onClose={() => setShowBulkDeleteModal(false)}
         onConfirm={handleBulkDelete}
-        title={user?.role === 'admin' ? t('delete_selected_admin') : t('delete_selected')}
+        title={user?.role === 'admin' ? tSafe('delete_selected_admin', 'Delete Selected (Admin)') : tSafe('delete_selected', 'Delete Selected')}
         message={
           user?.role === 'admin'
-            ? t('delete_selected_admin_confirm', { count: selectedIds.length }) || `WARNING: You are about to delete ${selectedIds.length} templates. As an admin, you can delete templates created by other users. This action cannot be undone.`
-            : t('delete_selected_confirm', { count: selectedIds.length }) || `Are you sure you want to delete ${selectedIds.length} selected templates? This action cannot be undone.`
+            ? tSafe('delete_selected_admin_confirm', { count: selectedIds.length }) || `Are you sure you want to delete ${selectedIds.length} templates?`
+            : tSafe('delete_selected_confirm', { count: selectedIds.length }) || `Are you sure you want to delete ${selectedIds.length} templates?`
         }
-        confirmText={`${t('delete')} ${selectedIds.length} ${t('templates')}`}
+        confirmText={`${tSafe('delete', 'Delete')} ${selectedIds.length} ${tSafe('templates', 'templates')}`}
         confirmColor="danger"
       />
     </div>

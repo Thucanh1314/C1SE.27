@@ -1,4 +1,5 @@
 @use '../../../styles/variables' as *;
+$primary-light: #F0FDFA; // Define locally if not in variables
 
 .templateEditor {
   width: 100%;
@@ -166,7 +167,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, $primary 0%, $primary-dark 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -176,8 +177,8 @@
   transition: all 0.2s;
 
   &:hover:not(:disabled) {
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, $primary-dark 0%, #047857 100%);
+    box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
   }
 
   &:disabled {
@@ -191,35 +192,155 @@
   }
 }
 
-.questionsList {
+
+// -----------------------------------------------------------------------------
+// Step Indicator
+// -----------------------------------------------------------------------------
+.stepIndicator {
   display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: $gray-400;
+    font-weight: 500;
+    font-size: 0.95rem;
+    position: relative;
+    z-index: 1;
+
+    &.active {
+      color: $gray-900;
+      font-weight: 600;
+
+      .stepNumber {
+        background: $primary;
+        color: white;
+        border-color: $primary;
+      }
+    }
+
+    &.completed {
+      color: $primary-dark;
+
+      .stepNumber {
+        background: $primary-light;
+        color: $primary;
+        border-color: $primary;
+      }
+    }
+  }
+
+  .stepNumber {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid $gray-200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: all 0.2s;
+  }
+
+  .stepLine {
+    height: 2px;
+    width: 60px;
+    background: $gray-200;
+    margin: 0 1rem;
+    border-radius: 2px;
+
+    &.active {
+      background: $primary;
+    }
+  }
 }
 
+// -----------------------------------------------------------------------------
+// Main Layout
+// -----------------------------------------------------------------------------
+.sidebar {
+  @media (max-width: 1024px) {
+    order: 2;
+  }
+}
+
+.main {
+  @media (max-width: 1024px) {
+    order: 1;
+  }
+}
+
+.lockedSection {
+  opacity: 0.6;
+  pointer-events: none;
+  filter: grayscale(1);
+  position: relative;
+
+  // Optional: Add a "Locked" badge or overlay if desired, but opacity might be enough.
+}
+
+// -----------------------------------------------------------------------------
+// Empty State
+// -----------------------------------------------------------------------------
 .emptyQuestions {
   text-align: center;
   padding: 4rem 2rem;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px dashed $gray-300; // Dashed border for "drop area" feel
+  box-shadow: none;
+  transition: all 0.2s;
+
+  .emptyIcon {
+    font-size: 3rem;
+    margin-bottom: 1.5rem;
+    color: $gray-300;
+    display: flex;
+    justify-content: center;
+
+    svg {
+      stroke-width: 1.5;
+    }
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: $gray-900;
+    margin-bottom: 0.5rem;
+  }
 
   p {
-    font-size: 0.9375rem;
-    color: #6b7280;
-    margin: 0.5rem 0;
+    font-size: 0.95rem;
+    color: $gray-500;
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  .emptyHint {
+    margin-top: 1rem;
+    padding: 0.5rem 1rem;
+    background: $gray-50;
+    border-radius: 100px;
+    display: inline-block;
+    font-size: 0.85rem;
+    color: $gray-600;
+    font-weight: 500;
   }
 }
 
-.emptyIcon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-}
+// ... existing modal styles ...
 
-.emptyHint {
-  font-size: 0.875rem !important;
-  color: #9ca3af !important;
-}
 
 // Modal styles
 .modalForm {

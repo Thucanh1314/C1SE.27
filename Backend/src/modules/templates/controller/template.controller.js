@@ -8,10 +8,10 @@ class TemplateController {
    */
   async getAllTemplates(req, res) {
     try {
-      const { page, limit, search } = req.query;
+      const { page, limit, search, scope } = req.query;
 
       const result = await templateService.getAllTemplates(
-        { page, limit, search },
+        { page, limit, search, scope },
         req.user
       );
 
@@ -46,7 +46,7 @@ class TemplateController {
 
       // Extract questions from the template object and format the response correctly
       const rawQuestions = template.Questions || [];
-      
+
       // Format questions for frontend compatibility
       const questions = rawQuestions.map(question => ({
         id: question.id,
@@ -68,7 +68,7 @@ class TemplateController {
         QuestionType: question.QuestionType,
         QuestionOptions: question.QuestionOptions
       }));
-      
+
       const templateData = {
         id: template.id,
         title: template.title,

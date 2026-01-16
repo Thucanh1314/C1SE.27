@@ -8,10 +8,10 @@ class SurveyController {
    */
   async getAllSurveys(req, res) {
     try {
-      const { page, limit, status, target_audience, search } = req.query;
+      const { page, limit, status, target_audience, search, source } = req.query;
 
       const result = await surveyService.getAllSurveys(
-        { page, limit, status, target_audience, search },
+        { page, limit, status, target_audience, search, source },
         req.user
       );
 
@@ -28,6 +28,32 @@ class SurveyController {
     }
   }
 
+  /**
+   * Get surveys assigned to the current user
+   */
+  async getAssignedSurveys(req, res) {
+    try {
+      const { page, limit, status, search } = req.query;
+
+      const result = await surveyService.getAssignedSurveys(
+        req.user.id,
+        req.user.email,
+        status || 'pending',
+        { page, limit, search }
+      );
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      logger.error('Get assigned surveys error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error fetching assigned surveys'
+      });
+    }
+  }
   /**
    * Get survey by ID
    */
@@ -349,6 +375,40 @@ class SurveyController {
         success: false,
         message: error.message || 'Error updating survey status'
       });
+    }
+  }
+
+  /**
+   * Restore survey
+   */
+  async restoreSurvey(req, res) {
+    try {
+      const { id } = req.params;
+
+      const survey = await surveyService.restoreSurvey(id, req.user);
+
+      res.status(200).json({
+        success: true,
+        message: 'Survey restored successfully',
+        data: { survey }
+      });
+    } catch (error) {
+      logger.error('Restore survey error:', error);
+
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      if (error.message.includes('Access denied')) {
+        return res.status(403).json({
+          success: false,
+          message: error.message
+        });
+      }
+
     }
   }
 }

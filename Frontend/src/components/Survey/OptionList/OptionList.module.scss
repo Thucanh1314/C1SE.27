@@ -1,0 +1,100 @@
+@use '../../../styles/variables' as *;
+
+.optionList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.optionItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f3f4f6;
+  }
+}
+
+.optionInput {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: not-allowed;
+}
+
+.optionText {
+  flex: 1;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.editButton,
+.deleteButton {
+  padding: 0.375rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: white;
+  }
+}
+
+.editButton {
+  color: $primary;
+
+  &:hover {
+    color: $primary-hover;
+  }
+}
+
+.deleteButton {
+  color: #ef4444;
+
+  &:hover {
+    color: #dc2626;
+  }
+}
+
+.addButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #14B8A6;
+    color: #14B8A6;
+    background: #f0fdf4;
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+}

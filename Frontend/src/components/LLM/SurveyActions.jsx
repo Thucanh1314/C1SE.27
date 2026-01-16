@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card from '../UI/Card';
 import Button from '../UI/Button';
-import Badge from '../UI/Badge';
 import { useToast } from '../../contexts/ToastContext';
 import LLMService from '../../api/services/llm.service';
 import styles from './SurveyActions.module.scss';
 
-const SurveyActions = ({ survey, onClose }) => {
+const SurveyActions = ({ survey, onClose, onEditSurvey }) => {
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [previewStates, setPreviewStates] = useState({});
 
   const handleExportPDF = async () => {
     setLoading(true);
@@ -28,74 +30,184 @@ const SurveyActions = ({ survey, onClose }) => {
     }
   };
 
+  const togglePreview = (questionIndex) => {
+    setPreviewStates(prev => ({
+      ...prev,
+      [questionIndex]: !prev[questionIndex]
+    }));
+  };
+
+  const getQuestionTypeLabel = (type) => {
+    const typeMap = {
+      'text': 'Text',
+      'multiple_choice': 'Multiple Choice',
+      'yes_no': 'Yes/No',
+      'rating': 'Rating',
+      'date': 'Date',
+      'email': 'Email'
+    };
+    return typeMap[type] || type;
+  };
+
+  const renderPreview = (type) => {
+    switch (type) {
+      case 'text':
+        return (
+          <div className={styles.previewContainer}>
+            <textarea
+              className={styles.previewTextarea}
+              placeholder="User's text response will appear here..."
+              disabled
+            />
+          </div>
+        );
+      case 'yes_no':
+        return (
+          <div className={styles.previewContainer}>
+            <div className={styles.previewRadio}>
+              <input type="radio" disabled /> <span>Yes</span>
+            </div>
+            <div className={styles.previewRadio}>
+              <input type="radio" disabled /> <span>No</span>
+            </div>
+          </div>
+        );
+      case 'rating':
+        return (
+          <div className={styles.previewContainer}>
+            <div className={styles.previewRating}>
+              {[1, 2, 3, 4, 5].map(num => (
+                <span key={num} className={styles.ratingNumber}>{num}</span>
+              ))}
+            </div>
+          </div>
+        );
+      case 'multiple_choice':
+        return (
+          <div className={styles.previewContainer}>
+            <div className={styles.previewRadio}>
+              <input type="radio" disabled /> <span>Option 1</span>
+            </div>
+            <div className={styles.previewRadio}>
+              <input type="radio" disabled /> <span>Option 2</span>
+            </div>
+            <div className={styles.previewRadio}>
+              <input type="radio" disabled /> <span>Option 3</span>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const totalQuestions = survey.totalQuestions || survey.questions?.length || 0;
+  const createdDate = formatDate(survey.survey.created_at);
+  const status = survey.survey.status || 'draft';
+
   return (
     <div className={styles.surveyActions}>
-      <Card className={styles.header}>
-        <div className={styles.titleSection}>
-          <h3>{survey.survey.title}</h3>
-          <Badge variant="success">
-            {survey.totalQuestions} questions
-          </Badge>
-        </div>
-        <p className={styles.description}>
-          {survey.survey.description || 'No description'}
+      {/* Survey Summary */}
+      <Card className={styles.summaryCard}>
+        <h3 className={styles.summaryTitle}>Survey Summary</h3>
+        <h2 className={styles.surveyTitle}>{survey.survey.title}</h2>
+        <p className={styles.surveyDescription}>
+          {survey.survey.description || 'No description provided'}
         </p>
-        <div className={styles.meta}>
-          <span>ID: {survey.survey.id}</span>
-          <span>Status: {survey.survey.status}</span>
-          <span>Created: {new Date(survey.survey.created_at).toLocaleString('en-US')}</span>
+        <div className={styles.surveyMeta}>
+          <span>{totalQuestions} question{totalQuestions !== 1 ? 's' : ''}</span>
+          <span className={styles.metaSeparator}>•</span>
+          <span>Created on {createdDate}</span>
+          <span className={styles.metaSeparator}>•</span>
+          <span>Status: {status.charAt(0).toUpperCase() + status.slice(1)}</span>
         </div>
       </Card>
 
-      <div className={styles.actionGrid}>
-        <Card className={styles.actionCard}>
-          <div className={styles.actionIcon}>📄</div>
-          <h4>Export PDF</h4>
-          <p>Download survey as PDF file for printing or offline sharing</p>
-          <Button
-            onClick={handleExportPDF}
-            loading={loading}
-            variant="outline"
-            className={styles.actionButton}
-          >
-            Download PDF
-          </Button>
-        </Card>
+      {/* Survey Readiness */}
+      <div className={styles.readinessSection}>
+        <p className={styles.readinessText}>All questions are valid</p>
+        <p className={styles.readinessText}>Survey is ready to be shared</p>
       </div>
 
-      {/* Questions Preview */}
-      <Card className={styles.questionsPreview}>
-        <h4>Questions in Survey ({survey.totalQuestions || survey.questions?.length || 0})</h4>
+      {/* Questions List */}
+      <Card className={styles.questionsCard}>
+        <h4 className={styles.questionsHeader}>Questions in This Survey</h4>
         <div className={styles.questionsList}>
           {(survey.questions || []).map((question, index) => {
             const questionText = question.question_text || question.text || String(question);
             const questionType = question.question_type || question.type || question.QuestionType?.type_name || 'text';
-            const isRequired = question.is_required || question.required || false;
+            const showPreview = previewStates[index];
 
             return (
-              <div key={question.id || index} className={styles.questionPreview}>
-                <div className={styles.questionNumber}>{index + 1}</div>
-                <div className={styles.questionContent}>
-                  <p className={styles.questionText}>{questionText}</p>
-                  <div className={styles.questionMeta}>
-                    <Badge variant="outline">{questionType}</Badge>
-                    {isRequired && <Badge variant="warning">Required</Badge>}
+              <div key={question.id || index} className={styles.questionItem}>
+                <div className={styles.questionRow}>
+                  <span className={styles.questionNumber}>{index + 1}.</span>
+                  <div className={styles.questionContent}>
+                    <p className={styles.questionText}>{questionText}</p>
+                    <div className={styles.questionMeta}>
+                      <span className={styles.questionType}>{getQuestionTypeLabel(questionType)}</span>
+                      <button
+                        className={styles.previewButton}
+                        onClick={() => togglePreview(index)}
+                      >
+                        {showPreview ? 'Hide preview' : 'Preview response format'}
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {showPreview && renderPreview(questionType)}
               </div>
             );
           })}
         </div>
+
+        {/* Export PDF - Secondary Action */}
+        <div className={styles.exportSection}>
+          <Button
+            onClick={handleExportPDF}
+            loading={loading}
+            variant="outline"
+            className={styles.exportButton}
+          >
+            Download as PDF
+          </Button>
+        </div>
       </Card>
 
-      {/* Actions */}
-      <div className={styles.bottomActions}>
-        <Button onClick={onClose} variant="outline">
-          Continue Editing
-        </Button>
-        <Button onClick={() => window.location.href = '/surveys'}>
-          Complete & View List
-        </Button>
+      {/* Primary and Secondary Actions */}
+      <div className={styles.actionsArea}>
+        <div className={styles.secondaryActions}>
+          <Button
+            onClick={() => navigate('/surveys')}
+            variant="outline"
+          >
+            Back to Surveys
+          </Button>
+          <Button
+            onClick={() => navigate(`/collectors?survey=${survey.survey.id}`)}
+            variant="outline"
+          >
+            Go to Collectors
+          </Button>
+        </div>
+        <div className={styles.primaryAction}>
+          <Button
+            onClick={() => navigate(`/surveys/${survey.survey.id}/edit`)}
+            className={styles.editButton}
+          >
+            Edit Survey
+          </Button>
+        </div>
       </div>
     </div>
   );

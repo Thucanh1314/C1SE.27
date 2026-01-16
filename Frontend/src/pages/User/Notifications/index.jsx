@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styles from './Notifications.module.scss';
 import NotificationService from '../../../api/services/notification.service';
+import WorkspaceService from '../../../api/services/workspace.service';
+import { useToast } from '../../../contexts/ToastContext';
 
 const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
@@ -8,6 +11,8 @@ const Notifications = () => {
   const [filter, setFilter] = useState('all'); // all, unread, read
   const [typeFilter, setTypeFilter] = useState('all'); // all, workspace_invitation, survey_response, etc
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchNotifications();
@@ -45,10 +50,61 @@ const Notifications = () => {
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
   };
 
+  const handleNotificationClick = async (notification) => {
+    // Get action URL from either direct property or data field
+    const actionUrl = notification.action_url ||
+      (notification.data && notification.data.action_url) ||
+      null;
+
+    // Handle different notification types with specific routing
+    let targetUrl = actionUrl;
+
+    if (!targetUrl && notification.type === 'survey_invitation') {
+      if (notification.data && notification.data.invite_token) {
+        targetUrl = `/public/invite/${notification.data.invite_token}`;
+      } else if (notification.related_survey_id) {
+        targetUrl = `/surveys/${notification.related_survey_id}/respond`;
+      }
+    }
+
+    // Mark as read first
+    if (!notification.is_read) {
+      await handleMarkAsRead(notification.id);
+    }
+
+    // Navigate if we have a target URL
+    if (targetUrl) {
+      try {
+        navigate(targetUrl);
+      } catch (error) {
+        console.error('Navigation error:', error);
+        showToast('Navigation failed', 'error');
+      }
+    } else {
+      // No action URL found - just mark as read and show toast
+      showToast('Notification marked as read', 'info');
+    }
+  };
+
   const handleAcceptWorkspaceInvitation = (notificationId, invitationData) => {
     if (invitationData?.token) {
       window.location.href = `/workspace/invitation/${invitationData.token}/accept`;
       handleMarkAsRead(notificationId);
+    }
+  };
+
+  const handleRoleRequest = async (notificationId, action) => {
+    try {
+      const result = await WorkspaceService.handleRoleRequest(notificationId, action);
+      if (result.ok) {
+        showToast(result.message, 'success');
+        // Refresh notifications
+        fetchNotifications();
+      } else {
+        showToast(result.message || 'Action failed', 'error');
+      }
+    } catch (error) {
+      showToast('Error processing request', 'error');
     }
   };
 
@@ -58,6 +114,8 @@ const Notifications = () => {
         return '✉️';
       case 'workspace_member_added':
         return '👥';
+      case 'survey_invitation':
+        return '📋';
       case 'survey_response':
         return '📝';
       case 'survey_shared':
@@ -66,6 +124,8 @@ const Notifications = () => {
         return '🔗';
       case 'response_completed':
         return '✅';
+      case 'role_change_request':
+        return '⚡';
       default:
         return '📢';
     }
@@ -121,11 +181,12 @@ const Notifications = () => {
   });
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
-  
+
   // Get unique notification types for filter
   const notificationTypes = [
     { id: 'workspace_invitation', label: '✉️ Workspace Invitation' },
     { id: 'workspace_member_added', label: '👥 Member Added' },
+    { id: 'survey_invitation', label: '📋 Survey Invitation' },
     { id: 'survey_response', label: '📝 Survey Response' },
     { id: 'survey_shared', label: '📤 Survey Shared' },
     { id: 'collector_created', label: '🔗 Collector Created' },
@@ -151,8 +212,8 @@ const Notifications = () => {
         <>
           <div className={styles.searchBar}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-              <circle cx="8" cy="8" r="5" strokeWidth="1.5"/>
-              <path d="M13 13l4 4" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="8" cy="8" r="5" strokeWidth="1.5" />
+              <path d="M13 13l4 4" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             <input
               type="text"
@@ -162,7 +223,7 @@ const Notifications = () => {
               className={styles.searchInput}
             />
             {searchQuery && (
-              <button 
+              <button
                 className={styles.clearSearch}
                 onClick={() => setSearchQuery('')}
               >
@@ -232,7 +293,8 @@ const Notifications = () => {
           filteredNotifications.map(notification => (
             <div
               key={notification.id}
-              className={`${styles.notification} ${!notification.is_read ? styles.unread : ''}`}
+              className={`${styles.notification} ${!notification.is_read ? styles.unread : ''} ${styles.clickable}`}
+              onClick={() => handleNotificationClick(notification)}
             >
               <div className={styles.notificationIcon}>
                 {getNotificationIcon(notification.type)}
@@ -278,15 +340,44 @@ const Notifications = () => {
                   {notification.type === 'workspace_invitation' && notification.data?.token && (
                     <button
                       className={styles.actionButton}
-                      onClick={() => handleAcceptWorkspaceInvitation(notification.id, notification.data)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAcceptWorkspaceInvitation(notification.id, notification.data);
+                      }}
                     >
                       Accept Invitation
                     </button>
                   )}
 
+                  {notification.type === 'role_change_request' && !notification.is_read && (
+                    <div className={styles.buttonGroup}>
+                      <button
+                        className={`${styles.actionButton} ${styles.approve}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRoleRequest(notification.id, 'approve');
+                        }}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className={`${styles.actionButton} ${styles.decline}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRoleRequest(notification.id, 'decline');
+                        }}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  )}
+
                   <button
                     className={styles.deleteButton}
-                    onClick={() => handleDelete(notification.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(notification.id);
+                    }}
                   >
                     Delete
                   </button>

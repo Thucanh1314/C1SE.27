@@ -1,8 +1,0 @@
-{
-  "trained_date": "2025-10-25T19:16:47.730788",
-  "models": {
-    "category": "RandomForestClassifier",
-    "form_type": "LogisticRegression",
-    "complexity": "LogisticRegression"
-  }
-}

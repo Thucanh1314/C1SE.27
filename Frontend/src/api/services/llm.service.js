@@ -70,8 +70,15 @@ const LLMService = {
    * Generate questions using AI
    */
   async generateQuestions(data) {
-    const response = await http.post('/llm/generate-questions', data);
-    return response.data;
+    try {
+      const response = await http.post('/llm/generate', data, {
+        timeout: 60000 // Tăng lên 60 giây để phù hợp với thời gian generate thực tế (15-20s)
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Generate questions error:', error);
+      throw error;
+    }
   },
 
   /**
@@ -121,13 +128,13 @@ const LLMService = {
     const response = await http.get(`/llm/export-pdf/${surveyId}`, {
       responseType: 'text'
     });
-    
+
     // Create a new window with the HTML content for PDF printing
     const newWindow = window.open('', '_blank');
     if (newWindow) {
       newWindow.document.write(response.data);
       newWindow.document.close();
-      
+
       // Auto-trigger print dialog after content loads
       newWindow.onload = () => {
         setTimeout(() => {
@@ -135,7 +142,7 @@ const LLMService = {
         }, 500);
       };
     }
-    
+
     return { success: true, message: 'PDF đã mở để in. Chọn "Save as PDF" trong hộp thoại in để tải xuống.' };
   },
 

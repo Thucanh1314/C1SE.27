@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import WorkspaceService from '../../../api/services/workspace.service';
 import Loader from '../../../components/common/Loader/Loader';
@@ -15,13 +15,8 @@ const WorkspaceInvitationAccept = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [workspaceData, setWorkspaceData] = useState(null);
-  const [accepting, setAccepting] = useState(false);
 
-  useEffect(() => {
-    acceptInvitation();
-  }, [inviteToken]);
-
-  const acceptInvitation = async () => {
+  const acceptInvitation = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -44,7 +39,11 @@ const WorkspaceInvitationAccept = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [inviteToken, navigate]);
+
+  useEffect(() => {
+    acceptInvitation();
+  }, [acceptInvitation]);
 
   if (loading) {
     return (
@@ -95,8 +94,8 @@ const WorkspaceInvitationAccept = () => {
               Redirecting to workspace in a few seconds...
             </p>
             <div className={styles.actions}>
-              <button 
-                onClick={() => navigate(`/workspaces/${workspaceData.id}`)} 
+              <button
+                onClick={() => navigate(`/workspaces/${workspaceData.id}`)}
                 className={styles.primaryButton}
               >
                 Go to Workspace Now

@@ -1,0 +1,107 @@
+.upsellContainer {
+    padding: 12px 0;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    .iconWrapper {
+        margin-bottom: 24px;
+        
+        .lockCircle {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background-color: #fef3c7;
+            color: #d97706;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse-ring 2s infinite;
+        }
+    }
+
+    .content {
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 12px;
+        }
+
+        p {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #4b5563;
+            margin-bottom: 24px;
+            max-width: 400px;
+
+            strong {
+                color: #111827;
+                font-weight: 600;
+            }
+        }
+    }
+
+    .benefits {
+        width: 100%;
+        background-color: #f9fafb;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 32px;
+        text-align: left;
+
+        .benefitItem {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: #374151;
+
+            &:last-child {
+                margin-bottom: 0;
+            }
+
+            .benefitIcon {
+                color: #8b5cf6;
+                flex-shrink: 0;
+            }
+        }
+    }
+
+    .actions {
+        display: flex;
+        gap: 12px;
+        width: 100%;
+
+        :global(.btn) {
+            flex: 1;
+        }
+
+        .upgradeBtn {
+            background-color: #111827;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+
+            &:hover {
+                background-color: #1f2937;
+            }
+        }
+    }
+}
+
+@keyframes pulse-ring {
+    0% {
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(217, 119, 6, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(217, 119, 6, 0);
+    }
+}

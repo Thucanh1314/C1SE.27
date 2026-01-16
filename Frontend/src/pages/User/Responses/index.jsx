@@ -7,9 +7,12 @@ import { generateResponsePDF, generateAdvancedResponsePDF } from '../../../utils
 import Pagination from '../../../components/common/Pagination/Pagination';
 import ConfirmModal from '../../../components/UI/ConfirmModal';
 import Loader from '../../../components/common/Loader/Loader';
+import Modal from '../../../components/UI/Modal/Modal';
+import { useNavigate } from 'react-router-dom';
 import styles from './UserResponses.module.scss';
 
 const UserResponses = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showToast } = useToast();
 
@@ -31,9 +34,15 @@ const UserResponses = () => {
     sortOrder: searchParams.get('sortOrder') || 'DESC'
   });
 
+  // Client-side Quick Filters
+  const [quickFilter, setQuickFilter] = useState(null); // 'last7days', 'completed'
+
   // UI state
-  const [expandedResponse, setExpandedResponse] = useState(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  // const [selectedResponseId, setSelectedResponseId] = useState(null); // Unused
   const [responseDetail, setResponseDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false); // New loading state for detail
+
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
     responseId: null,
@@ -45,7 +54,7 @@ const UserResponses = () => {
     try {
       setLoading(true);
       const page = parseInt(searchParams.get('page')) || 1;
-      
+
       const params = {
         page,
         limit: pagination.limit,
@@ -75,9 +84,47 @@ const UserResponses = () => {
     }
   }, [searchParams, pagination.limit, filters, showToast]);
 
+  // Client-side filtering
+  const displayedResponses = React.useMemo(() => {
+    if (!quickFilter) return responses;
+
+    if (quickFilter === 'completed') {
+      return responses.filter(r => r.status === 'completed');
+    }
+
+    if (quickFilter === 'last7days') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return responses.filter(r => new Date(r.created_at) > sevenDaysAgo);
+    }
+
+    return responses;
+  }, [responses, quickFilter]);
+
+  // Summary Helper
+  const getSummary = () => {
+    if (responses.length === 0) return null;
+
+    const completedCount = responses.filter(r => r.status === 'completed').length;
+    const dates = responses.map(r => new Date(r.created_at).getTime()).filter(t => !isNaN(t));
+    const lastDate = dates.length > 0 ? new Date(Math.max(...dates)).toLocaleDateString() : 'N/A';
+    const total = responses.length;
+
+    return (
+      <div className={styles.summaryHeader}>
+        <span className={styles.summaryItem}>Total: {total}</span>
+        <span className={styles.summaryDivider}>•</span>
+        <span className={styles.summaryItem}>Completed: {completedCount}</span>
+        <span className={styles.summaryDivider}>•</span>
+        <span className={styles.summaryItem}>Last response: {lastDate}</span>
+      </div>
+    );
+  };
+
   // Fetch response detail
   const fetchResponseDetail = async (responseId) => {
     try {
+      setDetailLoading(true);
       const result = await ResponseService.getUserResponseDetail(responseId);
       if (result.success) {
         setResponseDetail(result.data.response);
@@ -85,13 +132,15 @@ const UserResponses = () => {
     } catch (error) {
       console.error('Error fetching response detail:', error);
       showToast('Failed to load response details', 'error');
+    } finally {
+      setDetailLoading(false);
     }
   };
 
   // Handle search and filters
   const handleFilterChange = (newFilters) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
-    
+
     // Update URL params
     const params = new URLSearchParams(searchParams);
     Object.entries({ ...filters, ...newFilters }).forEach(([key, value]) => {
@@ -112,15 +161,17 @@ const UserResponses = () => {
     setSearchParams(params);
   };
 
-  // Handle response expansion
-  const toggleResponseDetail = async (responseId) => {
-    if (expandedResponse === responseId) {
-      setExpandedResponse(null);
-      setResponseDetail(null);
-    } else {
-      setExpandedResponse(responseId);
-      await fetchResponseDetail(responseId);
-    }
+  // Handle preview modal
+  const openPreview = async (responseId) => {
+    // setSelectedResponseId(responseId);
+    setPreviewModalOpen(true);
+    setResponseDetail(null); // Clear previous
+    await fetchResponseDetail(responseId);
+  };
+
+  const closePreview = () => {
+    setPreviewModalOpen(false);
+    // setSelectedResponseId(null);
   };
 
   // Handle delete response
@@ -176,7 +227,7 @@ const UserResponses = () => {
     return answer.text_answer || 'No answer';
   };
 
-  // Status badge component
+  // Status badge component with improved semantics
   const StatusBadge = ({ status }) => {
     const getStatusClass = (status) => {
       switch (status) {
@@ -187,11 +238,15 @@ const UserResponses = () => {
       }
     };
 
+    const getLabel = (status) => {
+      if (status === 'completed') return 'Completed · View-only';
+      if (status === 'started') return 'In Progress · View-only';
+      return (status || 'Unknown') + ' · View-only';
+    };
+
     return (
       <span className={`${styles.statusBadge} ${getStatusClass(status)}`}>
-        {status === 'completed' ? 'Completed' : 
-         status === 'started' ? 'In Progress' : 
-         'Abandoned'}
+        {getLabel(status)}
       </span>
     );
   };
@@ -216,64 +271,104 @@ const UserResponses = () => {
       <div className={styles.header}>
         <h1>My Survey Responses</h1>
         <p>View and manage your survey participation history</p>
+
+        {!loading && getSummary()}
       </div>
 
       {/* Filters and Search */}
       <div className={styles.filtersSection}>
-        <div className={styles.searchBox}>
-          <input
-            type="text"
-            placeholder="Search by survey name..."
-            value={filters.search}
-            onChange={(e) => handleFilterChange({ search: e.target.value })}
-            className={styles.searchInput}
-          />
+        <div className={styles.quickFilters}>
+          <button
+            className={`${styles.quickFilterBtn} ${!quickFilter ? styles.active : ''}`}
+            onClick={() => setQuickFilter(null)}
+          >
+            All Time
+          </button>
+          <button
+            className={`${styles.quickFilterBtn} ${quickFilter === 'last7days' ? styles.active : ''}`}
+            onClick={() => setQuickFilter(quickFilter === 'last7days' ? null : 'last7days')}
+          >
+            Last 7 days
+          </button>
+          <button
+            className={`${styles.quickFilterBtn} ${quickFilter === 'completed' ? styles.active : ''}`}
+            onClick={() => setQuickFilter(quickFilter === 'completed' ? null : 'completed')}
+          >
+            Completed only
+          </button>
         </div>
 
-        <div className={styles.filters}>
-          <select
-            value={filters.status}
-            onChange={(e) => handleFilterChange({ status: e.target.value })}
-            className={styles.filterSelect}
-          >
-            <option value="">All Status</option>
-            <option value="completed">Completed</option>
-            <option value="started">In Progress</option>
-            <option value="abandoned">Abandoned</option>
-          </select>
+        <div className={styles.filterRow}>
+          <div className={styles.searchBox}>
+            <input
+              type="text"
+              placeholder="Search by survey name..."
+              value={filters.search}
+              onChange={(e) => handleFilterChange({ search: e.target.value })}
+              className={styles.searchInput}
+            />
+          </div>
 
-          <select
-            value={`${filters.sortBy}:${filters.sortOrder}`}
-            onChange={(e) => {
-              const [sortBy, sortOrder] = e.target.value.split(':');
-              handleFilterChange({ sortBy, sortOrder });
-            }}
-            className={styles.filterSelect}
-          >
-            <option value="created_at:DESC">Newest First</option>
-            <option value="created_at:ASC">Oldest First</option>
-            <option value="updated_at:DESC">Recently Updated</option>
-          </select>
+          <div className={styles.filters}>
+            <select
+              value={filters.status}
+              onChange={(e) => handleFilterChange({ status: e.target.value })}
+              className={styles.filterSelect}
+            >
+              <option value="">All Status</option>
+              <option value="completed">Completed</option>
+              <option value="started">In Progress</option>
+              <option value="abandoned">Abandoned</option>
+            </select>
+
+            <select
+              value={`${filters.sortBy}:${filters.sortOrder}`}
+              onChange={(e) => {
+                const [sortBy, sortOrder] = e.target.value.split(':');
+                handleFilterChange({ sortBy, sortOrder });
+              }}
+              className={styles.filterSelect}
+            >
+              <option value="created_at:DESC">Newest First</option>
+              <option value="created_at:ASC">Oldest First</option>
+              <option value="updated_at:DESC">Recently Updated</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Results Summary */}
-      {!loading && (
-        <div className={styles.summary}>
-          Showing {responses.length} of {pagination.total} responses
+      {displayedResponses.length === 0 && !loading ? (
+        <div className={styles.emptyState}>
+          {responses.length === 0 ? (
+            <>
+              <h3 className={styles.emptyTitle}>No survey responses yet</h3>
+              <p className={styles.emptyBody}>When you complete a survey, it will appear here.</p>
+              <button
+                className={styles.primaryButton}
+                onClick={() => navigate('/surveys')}
+              >
+                Explore Surveys
+              </button>
+            </>
+          ) : (
+            <>
+              <h3 className={styles.emptyTitle}>No matching responses</h3>
+              <p className={styles.emptyBody}>Try adjusting your filters.</p>
+              <button
+                className={styles.secondaryButton}
+                onClick={() => {
+                  setFilters({ search: '', status: '', sortBy: 'created_at', sortOrder: 'DESC' });
+                  setQuickFilter(null);
+                }}
+              >
+                Clear Filters
+              </button>
+            </>
+          )}
         </div>
-      )}
-
-      {/* Responses List */}
-      <div className={styles.responsesList}>
-        {responses.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon}>📝</div>
-            <h3>No survey responses found</h3>
-            <p>You haven't participated in any surveys yet, or no surveys match your current filters.</p>
-          </div>
-        ) : (
-          responses.map((response) => (
+      ) : (
+        <div className={styles.responsesList}>
+          {displayedResponses.map((response) => (
             <div key={response.id} className={styles.responseCard}>
               <div className={styles.responseHeader}>
                 <div className={styles.responseInfo}>
@@ -293,19 +388,19 @@ const UserResponses = () => {
 
                 <div className={styles.responseActions}>
                   <button
-                    onClick={() => toggleResponseDetail(response.id)}
+                    onClick={() => openPreview(response.id)}
                     className={styles.viewButton}
                     disabled={loading}
                   >
-                    {expandedResponse === response.id ? 'Hide Details' : 'View Details'}
+                    View Details
                   </button>
 
                   <button
                     onClick={() => handleDownloadPDF(response)}
                     className={styles.downloadButton}
-                    title="Download as PDF"
+                    title="Download your answers as a PDF"
                   >
-                    📄 PDF
+                    Export My Answers (PDF)
                   </button>
 
                   <button
@@ -317,40 +412,17 @@ const UserResponses = () => {
                     className={styles.deleteButton}
                     title="Delete this response"
                   >
-                    🗑️
+                    Delete
                   </button>
                 </div>
               </div>
-
-              {/* Expanded response details */}
-              {expandedResponse === response.id && responseDetail && (
-                <div className={styles.responseDetails}>
-                  <h4>Your Answers</h4>
-                  {responseDetail.Answers && responseDetail.Answers.length > 0 ? (
-                    <div className={styles.answersGrid}>
-                      {responseDetail.Answers.map((answer, index) => (
-                        <div key={index} className={styles.answerItem}>
-                          <div className={styles.questionText}>
-                            {answer.Question.label || answer.Question.question_text}
-                          </div>
-                          <div className={styles.answerText}>
-                            {formatAnswer(answer)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className={styles.noAnswers}>No answers recorded</p>
-                  )}
-                </div>
-              )}
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Pagination */}
-      {pagination.totalPages > 1 && (
+      {!quickFilter && pagination.totalPages > 1 && (
         <div className={styles.paginationSection}>
           <Pagination
             currentPage={pagination.page}
@@ -359,6 +431,53 @@ const UserResponses = () => {
           />
         </div>
       )}
+
+      {/* Preview Modal */}
+      <Modal
+        isOpen={previewModalOpen}
+        onClose={closePreview}
+        title="Response Details"
+        size="lg"
+      >
+        <div className={styles.previewModalContent}>
+          {detailLoading ? (
+            <div className={styles.modalLoader}><Loader message="Loading details..." /></div>
+          ) : responseDetail ? (
+            <>
+              <div className={styles.modalMeta}>
+                <strong>Survey:</strong> {responseDetail.Survey?.title} <br />
+                <strong>Date:</strong> {new Date(responseDetail.created_at).toLocaleDateString()}
+              </div>
+              <div className={styles.modalAnswers}>
+                <h4>Response Summary</h4>
+                {responseDetail.Answers && responseDetail.Answers.length > 0 ? (
+                  <div className={styles.answersList}>
+                    {responseDetail.Answers.map((answer, index) => (
+                      <div key={index} className={styles.answerRow}>
+                        <div className={styles.questionLabel}>
+                          <span className={styles.qNum}>Q{index + 1}.</span>
+                          {answer.Question.question_text}
+                        </div>
+                        <div className={styles.answerValue}>
+                          {formatAnswer(answer)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={styles.noAnswers}>No answers recorded or details unavailable.</p>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className={styles.errorMessage}>Details not available.</p>
+          )}
+
+          <div className={styles.modalActions}>
+            <button className={styles.closeBtn} onClick={closePreview}>Close</button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal

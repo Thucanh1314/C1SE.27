@@ -1,0 +1,46 @@
+[
+  {
+    "id": 1,
+    "name": "single_choice"
+  },
+  {
+    "id": 2,
+    "name": "multiple_choice"
+  },
+  {
+    "id": 3,
+    "name": "text"
+  },
+  {
+    "id": 4,
+    "name": "rating"
+  },
+  {
+    "id": 5,
+    "name": "likert_scale"
+  },
+  {
+    "id": 6,
+    "name": "dropdown"
+  },
+  {
+    "id": 7,
+    "name": "checkbox"
+  },
+  {
+    "id": 8,
+    "name": "open_ended"
+  },
+  {
+    "id": 9,
+    "name": "likert"
+  },
+  {
+    "id": 10,
+    "name": "matrix"
+  },
+  {
+    "id": 11,
+    "name": "ranking"
+  }
+]

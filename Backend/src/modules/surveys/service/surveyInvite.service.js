@@ -27,8 +27,12 @@ class SurveyInviteService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + expiresInDays);
 
+    // Initialize notification service
+    const notificationService = require('../../notifications/service/notification.service');
+
     for (const email of emails) {
       // Check if invite already exists
+      let invite;
       const existingInvite = await SurveyInvite.findOne({
         where: { survey_id: surveyId, email }
       });
@@ -40,10 +44,11 @@ class SurveyInviteService {
         existingInvite.expires_at = expiresAt;
         existingInvite.responded_at = null;
         await existingInvite.save();
-        invites.push(existingInvite);
+        invite = existingInvite;
+        invites.push(invite);
       } else {
         // Create new invite
-        const invite = await SurveyInvite.create({
+        invite = await SurveyInvite.create({
           survey_id: surveyId,
           email,
           token: crypto.randomBytes(32).toString('hex'),
@@ -51,6 +56,40 @@ class SurveyInviteService {
           created_by: userId
         });
         invites.push(invite);
+      }
+
+      // Notify if the email belongs to a registered user
+      const user = await User.findOne({ where: { email } });
+      if (user) {
+        try {
+          // Build detailed notification message
+          let message = `You have been invited to participate in the survey: "${survey.title}"`;
+          if (survey.description) {
+            message += `\n\n${survey.description.substring(0, 150)}${survey.description.length > 150 ? '...' : ''}`;
+          }
+          if (survey.end_date) {
+            const endDate = new Date(survey.end_date);
+            const now = new Date();
+            const daysLeft = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+            if (daysLeft > 0) {
+              message += `\n\n⏰ Deadline: ${endDate.toLocaleDateString()} (${daysLeft} days left)`;
+            }
+          }
+
+          await notificationService.createNotification({
+            userId: user.id,
+            type: 'survey_invite',
+            title: '📧 New Survey Invitation',
+            message,
+            actionUrl: `/invitations?type=survey&inviteId=${invite.id}`,
+            actorId: userId,
+            relatedSurveyId: surveyId,
+            relatedUserId: user.id
+          });
+        } catch (notifError) {
+          console.error(`[SurveyInvite] Failed to create notification for ${email}:`, notifError.message);
+          // Continue - don't fail invite creation if notification fails
+        }
       }
     }
 

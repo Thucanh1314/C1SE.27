@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
 import { useToast } from '../../../contexts/ToastContext';
-import SurveyService from '../../../api/services/survey.service';
+import AnalyticsService from '../../../api/services/analytics.service';
 import StatCard from '../../../components/UI/StatCard';
 import ChartCard from '../../../components/UI/ChartCard';
 import Loader from '../../../components/common/Loader/Loader';
@@ -32,28 +32,21 @@ const CreatorDashboard = () => {
   const fetchCreatorData = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch creator's surveys
-      const surveysResponse = await SurveyService.getMySurveys();
+      // Fetch dashboard stats from backend
+      const stats = await AnalyticsService.getCreatorDashboard();
 
-      // getMySurveys returns { surveys: [...], pagination: {...} }
-      const surveys = surveysResponse.surveys || [];
-
-      // Calculate summary
-      const draft = surveys.filter(s => s.status === 'draft').length;
-      const active = surveys.filter(s => s.status === 'active').length;
-      const closed = surveys.filter(s => s.status === 'closed').length;
-
+      // stats = { totalSurveys, activeSurveys, draftSurveys, closedSurveys }
       setSummary({
-        totalSurveys: surveys.length,
-        activeSurveys: active,
-        closedSurveys: closed,
-        draftSurveys: draft
+        totalSurveys: stats.totalSurveys || 0,
+        activeSurveys: stats.activeSurveys || 0,
+        closedSurveys: stats.closedSurveys || 0,
+        draftSurveys: stats.draftSurveys || 0
       });
 
       setStatusDistribution({
-        draft,
-        active,
-        closed
+        draft: stats.draftSurveys || 0,
+        active: stats.activeSurveys || 0,
+        closed: stats.closedSurveys || 0
       });
 
     } catch (error) {

@@ -8,17 +8,17 @@ export const useLanguage = () => {
 };
 
 export const LanguageProvider = ({ children }) => {
-    // Get language from local storage or default to 'vi' (Vietnamese) as requested
+    // Get language from local storage or default to 'en' (English)
     const [language, setLanguage] = useState(() => {
-        const savedLanguage = localStorage.getItem('language');
-        return savedLanguage || 'vi';
+        const savedLanguage = localStorage.getItem('allmtags_lang');
+        return savedLanguage || 'en';
     });
 
     useEffect(() => {
-        localStorage.setItem('language', language);
+        localStorage.setItem('allmtags_lang', language);
     }, [language]);
 
-    const t = (key) => {
+    const t = (key, params = {}) => {
         const keys = key.split('.');
         let value = translations[language];
 
@@ -30,13 +30,31 @@ export const LanguageProvider = ({ children }) => {
             }
         }
 
+        // Simple interpolation: replace {{key}} with params[key]
+        if (typeof value === 'string' && params) {
+            Object.keys(params).forEach(paramKey => {
+                value = value.replace(new RegExp(`{{${paramKey}}}`, 'g'), params[paramKey]);
+            });
+        }
+
         return value;
+    };
+
+    /**
+     * Safe translation helper: returns fallback if translation missing or equals key
+     */
+    const tSafe = (key, fallback = '') => {
+        const val = t(key);
+        // If translation missing (val equals key or empty), return fallback
+        if (val === key || !val) return fallback;
+        return val;
     };
 
     const value = {
         language,
         setLanguage,
-        t
+        t,
+        tSafe
     };
 
     return (

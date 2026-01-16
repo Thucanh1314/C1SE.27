@@ -9,17 +9,18 @@ class WorkspaceController {
    */
   async getMyWorkspaces(req, res) {
     try {
-      const { page, limit, search } = req.query;
+      const { page, limit, search, scope } = req.query;
       const pagination = page && limit;
 
       if (pagination) {
         const result = await workspaceService.getMyWorkspacesPaginated(
-          req.user.id, 
+          req.user.id,
           req.user,
           {
             page: parseInt(page),
             limit: parseInt(limit),
-            search
+            search,
+            scope // Pass scope
           }
         );
 
@@ -72,6 +73,7 @@ class WorkspaceController {
         workspace
       });
     } catch (error) {
+      console.error('######## CONTROLLER ERROR:', error);
       logger.error('Create workspace error:', error);
       res.status(400).json({
         ok: false,
@@ -189,7 +191,8 @@ class WorkspaceController {
 
       logger.debug(`[removeMember] Called: workspaceId=${id}, memberId=${userId}, currentUserId=${req.user.id}`);
 
-      const result = await workspaceService.removeMember(id, parseInt(userId), req.user.id);
+      const io = req.app.get('io');
+      const result = await workspaceService.removeMember(id, parseInt(userId), req.user.id, io);
 
       res.status(200).json({
         ok: true,
@@ -218,6 +221,150 @@ class WorkspaceController {
       });
     }
   }
+
+  /**
+   * PATCH /api/modules/workspaces/:id/members/:userId
+   * Update member role (owner only)
+   */
+  async updateMemberRole(req, res) {
+    try {
+      const { id, userId } = req.params;
+      const { role } = req.body;
+
+      if (!role) {
+        return res.status(400).json({
+          ok: false,
+          message: 'Role is required'
+        });
+      }
+
+      const result = await workspaceService.updateMemberRole(
+        id,
+        parseInt(userId),
+        role,
+        req.user.id,
+        req.app.get('io')
+      );
+
+      res.status(200).json({
+        ok: true,
+        member: result,
+        message: result.message || 'Member role updated successfully'
+      });
+    } catch (error) {
+      logger.error('Update member role error:', error);
+
+      if (error.message.includes('owner can change')) {
+        return res.status(403).json({
+          ok: false,
+          message: error.message
+        });
+      }
+
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          ok: false,
+          message: error.message
+        });
+      }
+
+      res.status(400).json({
+        ok: false,
+        message: error.message || 'Error updating member role'
+      });
+    }
+  }
+
+  /**
+   * POST /api/modules/workspaces/:id/leave
+   * Leave workspace (members only, not owner)
+   */
+  async leaveWorkspace(req, res) {
+    try {
+      const { id } = req.params;
+
+      const io = req.app.get('io');
+      const result = await workspaceService.leaveWorkspace(id, req.user.id, io);
+
+      res.status(200).json({
+        ok: true,
+        message: result.message || 'Successfully left workspace'
+      });
+    } catch (error) {
+      logger.error('Leave workspace error:', error);
+
+      if (error.message.includes('owner cannot leave')) {
+        return res.status(403).json({
+          ok: false,
+          message: error.message
+        });
+      }
+
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          ok: false,
+          message: error.message
+        });
+      }
+
+      res.status(400).json({
+        ok: false,
+        message: error.message || 'Error leaving workspace'
+      });
+    }
+  }
+
+  /**
+   * POST /api/modules/workspaces/:id/transfer-ownership
+   * Transfer ownership to another member (owner only)
+   */
+  async transferOwnership(req, res) {
+    try {
+      const { id } = req.params;
+      const { newOwnerId } = req.body;
+
+      if (!newOwnerId) {
+        return res.status(400).json({
+          ok: false,
+          message: 'newOwnerId is required'
+        });
+      }
+
+      const result = await workspaceService.transferOwnership(
+        id,
+        parseInt(newOwnerId),
+        req.user.id
+      );
+
+      res.status(200).json({
+        ok: true,
+        result,
+        message: result.message || 'Ownership transferred successfully'
+      });
+    } catch (error) {
+      logger.error('Transfer ownership error:', error);
+
+      if (error.message.includes('owner can transfer')) {
+        return res.status(403).json({
+          ok: false,
+          message: error.message
+        });
+      }
+
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          ok: false,
+          message: error.message
+        });
+      }
+
+      res.status(400).json({
+        ok: false,
+        message: error.message || 'Error transferring ownership'
+      });
+    }
+  }
+
 
   /**
    * GET /api/modules/workspaces/:id/surveys
@@ -382,9 +529,9 @@ class WorkspaceController {
 
       const io = req.app.get('io'); // Get Socket.IO instance
       const invitation = await workspaceService.inviteToWorkspace(
-        id, 
-        req.user.id, 
-        email, 
+        id,
+        req.user.id,
+        email,
         role,
         io // Pass io for real-time notifications
       );
@@ -422,11 +569,14 @@ class WorkspaceController {
         });
       }
 
-      const workspace = await workspaceService.acceptInvitation(token, req.user.id);
+      const io = req.app.get('io'); // Get Socket.IO instance
+      const workspace = await workspaceService.acceptInvitation(token, req.user.id, io);
 
       res.status(200).json({
         ok: true,
+        success: true,
         message: 'Invitation accepted successfully',
+        redirectUrl: `/workspaces/${workspace.id}`, // SPA redirect target
         workspace: {
           id: workspace.id,
           name: workspace.name,
@@ -622,6 +772,30 @@ class WorkspaceController {
   }
 
   /**
+   * POST /api/modules/workspaces/invitations/:invitationId/decline
+   * Decline an invitation
+   */
+  async declineInvitation(req, res) {
+    try {
+      const { invitationId } = req.params;
+
+      await workspaceService.declineInvitation(invitationId, req.user.id);
+
+      res.status(200).json({
+        ok: true,
+        message: 'Invitation declined successfully'
+      });
+    } catch (error) {
+      logger.error('Decline invitation error:', error);
+      const statusCode = error.message.includes('Access denied') || error.message.includes('not found') ? 403 : 400;
+      res.status(statusCode).json({
+        ok: false,
+        message: error.message || 'Error declining invitation'
+      });
+    }
+  }
+
+  /**
    * POST /api/modules/workspaces/invitations/:invitationId/resend
    * Resend an invitation
    */
@@ -642,6 +816,30 @@ class WorkspaceController {
       res.status(statusCode).json({
         ok: false,
         message: error.message || 'Error resending invitation'
+      });
+    }
+  }
+
+  /**
+   * POST /api/modules/workspaces/invitations/:invitationId/decline
+   * Decline an invitation
+   */
+  async declineInvitation(req, res) {
+    try {
+      const { invitationId } = req.params;
+
+      await workspaceService.declineInvitation(invitationId, req.user.id);
+
+      res.status(200).json({
+        ok: true,
+        message: 'Invitation declined successfully'
+      });
+    } catch (error) {
+      logger.error('Decline invitation error:', error);
+      const statusCode = error.message.includes('Access denied') || error.message.includes('not found') ? 403 : 400;
+      res.status(statusCode).json({
+        ok: false,
+        message: error.message || 'Error declining invitation'
       });
     }
   }
@@ -690,6 +888,64 @@ class WorkspaceController {
       res.status(500).json({
         ok: false,
         message: error.message || 'Error deleting workspaces'
+      });
+    }
+  }
+
+  /**
+   * POST /api/modules/workspaces/:id/request-promotion
+   * Request a role upgrade in a workspace
+   */
+  async requestPromotion(req, res) {
+    try {
+      const { id } = req.params;
+      const { requestedRole } = req.body;
+
+      if (!requestedRole) {
+        return res.status(400).json({
+          ok: false,
+          message: 'Requested role is required'
+        });
+      }
+
+      const io = req.app.get('io');
+      const result = await workspaceService.requestRoleChange(id, req.user.id, requestedRole, io);
+
+      res.status(200).json(result);
+    } catch (error) {
+      logger.error('Request promotion error:', error);
+      res.status(400).json({
+        ok: false,
+        message: error.message || 'Error requesting promotion'
+      });
+    }
+  }
+
+  /**
+   * POST /api/modules/workspaces/notifications/:notificationId/handle-role-request
+   * Approve or decline a role change request
+   */
+  async handleRoleRequest(req, res) {
+    try {
+      const { notificationId } = req.params;
+      const { action } = req.body;
+
+      if (!['approve', 'decline'].includes(action)) {
+        return res.status(400).json({
+          ok: false,
+          message: 'Action must be either "approve" or "decline"'
+        });
+      }
+
+      const io = req.app.get('io');
+      const result = await workspaceService.handleRoleChangeRequest(notificationId, action, req.user.id, io);
+
+      res.status(200).json(result);
+    } catch (error) {
+      logger.error('Handle role request error:', error);
+      res.status(400).json({
+        ok: false,
+        message: error.message || 'Error handling role request'
       });
     }
   }

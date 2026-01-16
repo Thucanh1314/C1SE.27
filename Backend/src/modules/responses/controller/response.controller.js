@@ -133,27 +133,27 @@ class ResponseController {
    */
   async getUserResponses(req, res) {
     try {
-      const { 
-        page, 
-        limit, 
-        search, 
-        status, 
-        sortBy, 
-        sortOrder, 
-        includeAnswers 
+      const {
+        page,
+        limit,
+        search,
+        status,
+        sortBy,
+        sortOrder,
+        includeAnswers
       } = req.query;
 
       // Convert string boolean to actual boolean
       const includeAnswersFlag = includeAnswers === 'true';
 
-      const result = await responseService.getUserResponses(req.user, { 
-        page, 
-        limit, 
-        search, 
-        status, 
-        sortBy, 
+      const result = await responseService.getUserResponses(req.user, {
+        page,
+        limit,
+        search,
+        status,
+        sortBy,
         sortOrder,
-        includeAnswers: includeAnswersFlag 
+        includeAnswers: includeAnswersFlag
       });
 
       res.status(200).json({
@@ -252,6 +252,17 @@ class ResponseController {
         });
       }
 
+      // Hardening: Require client_response_id
+      if (!req.body.client_response_id && !req.body.response_id) {
+        // We allow response_id for legacy re-submissions or if explicit, but client_response_id should be there for new flow
+        // For now, warn or fail? User request said "Require client_response_id for all public save/submit endpoints."
+        // Let's enforce it if response_id is missing.
+        return res.status(400).json({
+          success: false,
+          message: 'client_response_id is required for idempotency'
+        });
+      }
+
       // Get user identifier (IP address or custom ID)
       const userIdentifier = req.body.identifier || req.ip || req.headers['x-forwarded-for'];
 
@@ -299,6 +310,65 @@ class ResponseController {
       });
     }
   }
+  /**
+   * Start a survey session
+   */
+  async startSession(req, res) {
+    try {
+      const { id } = req.params; // Survey ID
+      const { collector_token, session_id, client_response_id } = req.body;
+      const user = req.user; // Optional
+
+      const response = await responseService.startSession(id, collector_token, req.ip, user, session_id, client_response_id);
+
+      res.status(201).json({
+        success: true,
+        message: 'Session started',
+        data: {
+          response_id: response.id,
+          start_time: response.start_time
+        }
+      });
+    } catch (error) {
+      logger.error('Start session error:', error);
+      res.status(400).json({
+        success: false,
+        message: error.message || 'Error starting session'
+      });
+    }
+  }
+
+  /**
+   * Fix stuck response by marking as completed
+   */
+  async completeResponse(req, res) {
+    try {
+      const { id } = req.params;
+      
+      // Only allow admin to fix responses
+      if (req.user.role !== 'admin' && req.user.role !== 'creator') {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. Admin/Creator only.'
+        });
+      }
+
+      const result = await responseService.completeStuckResponse(id);
+
+      res.status(200).json({
+        success: true,
+        message: 'Response completed successfully',
+        data: result
+      });
+    } catch (error) {
+      logger.error('Complete response error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error completing response'
+      });
+    }
+  }
+
 }
 
 module.exports = new ResponseController();

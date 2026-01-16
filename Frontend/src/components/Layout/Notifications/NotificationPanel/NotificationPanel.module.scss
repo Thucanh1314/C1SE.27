@@ -1,0 +1,145 @@
+.notificationPanel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 380px;
+  max-height: 500px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  margin-top: 0.5rem;
+  overflow: hidden;
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #f3f4f6;
+
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #111827;
+      margin: 0;
+    }
+
+    .markAllRead {
+      font-size: 0.75rem;
+      color: #eb4f97; // Using primary brand color or generic blue
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 400px;
+  }
+
+  .loading,
+  .empty {
+    padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.875rem;
+  }
+
+  .notificationList {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .notification {
+    display: flex;
+    align-items: flex-start;
+    padding: 1rem;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    gap: 0.75rem;
+
+    &:hover {
+      background-color: #f9fafb;
+    }
+
+    &.unread {
+      background-color: #fff; // Or subtle different bg
+
+      .title {
+        font-weight: 600;
+        color: #111827;
+      }
+    }
+
+    .iconWrapper {
+      flex-shrink: 0;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      margin-top: 2px;
+    }
+
+    .info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .titleRow {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+
+      .title {
+        font-size: 0.875rem;
+        color: #374151;
+        line-height: 1.25;
+        margin-bottom: 2px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        background-color: #eb4f97; // Primary highlight
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+        margin-top: 5px;
+      }
+    }
+
+    .message {
+      font-size: 0.8125rem;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+
+      .time {
+        font-size: 0.75rem;
+        color: #9ca3af;
+      }
+    }
+  }
+}

@@ -1,3 +1,6 @@
+@use 'theme';
+@use 'variables' as *;
+
 /* ==========================================
    Global Typography System - Modern Readable Design
    Base font size: 16px for optimal readability
@@ -6,13 +9,20 @@
 
 :root {
   /* Font Size Scale - Standard Readable Typography */
-  --font-size-sm: 0.875rem;       /* 14px - Small text, minimum size */
-  --font-size-base: 1rem;         /* 16px - Body text, forms, buttons */
-  --font-size-md: 1.125rem;       /* 18px - Emphasized text, subtitles */
-  --font-size-lg: 1.25rem;        /* 20px - Section headers */
-  --font-size-xl: 1.5rem;         /* 24px - Page titles (h1) */
-  --font-size-2xl: 1.75rem;       /* 28px - Hero titles */
-  --font-size-3xl: 2rem;          /* 32px - Large display text */
+  --font-size-sm: 0.875rem;
+  /* 14px - Small text, minimum size */
+  --font-size-base: 1rem;
+  /* 16px - Body text, forms, buttons */
+  --font-size-md: 1.125rem;
+  /* 18px - Emphasized text, subtitles */
+  --font-size-lg: 1.25rem;
+  /* 20px - Section headers */
+  --font-size-xl: 1.5rem;
+  /* 24px - Page titles (h1) */
+  --font-size-2xl: 1.75rem;
+  /* 28px - Hero titles */
+  --font-size-3xl: 2rem;
+  /* 32px - Large display text */
 
   /* Line Heights - Improved vertical rhythm */
   --line-height-tight: 1.3;
@@ -33,28 +43,37 @@
   --letter-spacing-tight: -0.01em;
   --letter-spacing-normal: 0;
   --letter-spacing-wide: 0.025em;
-  
+
   /* Form & Button Padding - Comfortable touch/click targets */
-  --input-padding-y: 0.75rem;     /* 12px vertical */
-  --input-padding-x: 1rem;        /* 16px horizontal */
-  --button-padding-y: 0.75rem;    /* 12px vertical */
-  --button-padding-x: 1rem;       /* 16px horizontal */
+  --input-padding-y: 0.75rem;
+  /* 12px vertical */
+  --input-padding-x: 1rem;
+  /* 16px horizontal */
+  --button-padding-y: 0.75rem;
+  /* 12px vertical */
+  --button-padding-x: 1rem;
+  /* 16px horizontal */
 }
 
 /* Responsive Typography - Adjust for narrow laptops */
 @media (max-width: 1366px) {
   :root {
-    --font-size-base: 1.05rem;      /* 16.8px - Slightly larger on narrow screens */
-    --font-size-md: 1.15rem;        /* 18.4px */
-    --font-size-lg: 1.3rem;         /* 20.8px */
+    --font-size-base: 1.05rem;
+    /* 16.8px - Slightly larger on narrow screens */
+    --font-size-md: 1.15rem;
+    /* 18.4px */
+    --font-size-lg: 1.3rem;
+    /* 20.8px */
   }
 }
 
 /* Desktop optimization - maintain readability on large screens */
 @media (min-width: 1920px) {
   :root {
-    --font-size-base: 1rem;         /* Keep 16px on large screens */
-    --font-size-lg: 1.25rem;        /* 20px */
+    --font-size-base: 1rem;
+    /* Keep 16px on large screens */
+    --font-size-lg: 1.25rem;
+    /* 20px */
   }
 }
 
@@ -72,20 +91,26 @@ body {
   font-family: var(--font-family-base);
   font-size: var(--font-size-base);
   line-height: var(--line-height-base);
-  color: #222;
-  background-color: #fafafa;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary); /* Use theme bg */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   margin: 0;
   padding: 0;
+  transition: background-color 0.3s ease, color 0.3s ease; /* Smooth toggle */
 }
 
 /* ==========================================
    Typography Elements
    ========================================== */
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
   margin-top: 0;
@@ -203,13 +228,13 @@ button {
 
 table {
   font-size: var(--font-size-base);
-  
+
   th {
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
     padding: 0.75rem 1rem;
   }
-  
+
   td {
     font-size: var(--font-size-base);
     padding: 0.75rem 1rem;
@@ -220,10 +245,11 @@ table {
    Lists
    ========================================== */
 
-ul, ol {
+ul,
+ol {
   padding-left: 1.5rem;
   margin-bottom: 1rem;
-  
+
   li {
     font-size: var(--font-size-base);
     line-height: var(--line-height-base);
@@ -235,22 +261,61 @@ ul, ol {
    Utility Classes
    ========================================== */
 
-.text-sm { font-size: var(--font-size-sm); }
-.text-base { font-size: var(--font-size-base); }
-.text-md { font-size: var(--font-size-md); }
-.text-lg { font-size: var(--font-size-lg); }
-.text-xl { font-size: var(--font-size-xl); }
-.text-2xl { font-size: var(--font-size-2xl); }
-.text-3xl { font-size: var(--font-size-3xl); }
+.text-sm {
+  font-size: var(--font-size-sm);
+}
 
-.font-normal { font-weight: var(--font-weight-normal); }
-.font-medium { font-weight: var(--font-weight-medium); }
-.font-semibold { font-weight: var(--font-weight-semibold); }
-.font-bold { font-weight: var(--font-weight-bold); }
+.text-base {
+  font-size: var(--font-size-base);
+}
 
-.leading-tight { line-height: var(--line-height-tight); }
-.leading-base { line-height: var(--line-height-base); }
-.leading-relaxed { line-height: var(--line-height-relaxed); }
+.text-md {
+  font-size: var(--font-size-md);
+}
+
+.text-lg {
+  font-size: var(--font-size-lg);
+}
+
+.text-xl {
+  font-size: var(--font-size-xl);
+}
+
+.text-2xl {
+  font-size: var(--font-size-2xl);
+}
+
+.text-3xl {
+  font-size: var(--font-size-3xl);
+}
+
+.font-normal {
+  font-weight: var(--font-weight-normal);
+}
+
+.font-medium {
+  font-weight: var(--font-weight-medium);
+}
+
+.font-semibold {
+  font-weight: var(--font-weight-semibold);
+}
+
+.font-bold {
+  font-weight: var(--font-weight-bold);
+}
+
+.leading-tight {
+  line-height: var(--line-height-tight);
+}
+
+.leading-base {
+  line-height: var(--line-height-base);
+}
+
+.leading-relaxed {
+  line-height: var(--line-height-relaxed);
+}
 
 /* ==========================================
    Debug Utility (for QA testing)
@@ -280,7 +345,7 @@ ul, ol {
 .debug-font-size {
   * {
     position: relative;
-    
+
     &::before {
       content: 'font-size: ' attr(data-font-size);
       position: absolute;
@@ -297,7 +362,7 @@ ul, ol {
       opacity: 0;
       transition: opacity 0.2s;
     }
-    
+
     &:hover::before {
       opacity: 1;
     }
@@ -331,10 +396,25 @@ ul, ol {
     color: #000;
     background: #fff;
   }
-  
-  h1 { font-size: 24pt; }
-  h2 { font-size: 20pt; }
-  h3 { font-size: 16pt; }
-  h4 { font-size: 14pt; }
-  h5, h6 { font-size: 12pt; }
+
+  h1 {
+    font-size: 24pt;
+  }
+
+  h2 {
+    font-size: 20pt;
+  }
+
+  h3 {
+    font-size: 16pt;
+  }
+
+  h4 {
+    font-size: 14pt;
+  }
+
+  h5,
+  h6 {
+    font-size: 12pt;
+  }
 }

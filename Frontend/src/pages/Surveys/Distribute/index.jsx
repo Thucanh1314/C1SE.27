@@ -25,7 +25,7 @@ const SurveyDistribute = () => {
         CollectorService.getBySurvey(id)
       ]);
       setSurvey(surveyData);
-      
+
       // Map backend collector fields to frontend expected fields
       const mappedCollectors = (collectorsData || []).map(collector => ({
         id: collector.id,
@@ -38,7 +38,7 @@ const SurveyDistribute = () => {
         is_active: collector.is_active,
         allow_multiple_responses: collector.allow_multiple_responses
       }));
-      
+
       setCollectors(mappedCollectors);
     } catch (error) {
       showToast(error.response?.data?.message || 'Failed to load survey', 'error');
@@ -59,7 +59,7 @@ const SurveyDistribute = () => {
         type: 'web_link',
         name: `Web Link - ${new Date().toLocaleDateString()}`
       });
-      
+
       // Map backend fields to frontend expected fields
       const newCollector = {
         id: response.id,
@@ -72,7 +72,7 @@ const SurveyDistribute = () => {
         is_active: response.is_active,
         allow_multiple_responses: response.allow_multiple_responses
       };
-      
+
       setCollectors([newCollector, ...collectors]);
       showToast('Distribution link created successfully!', 'success');
     } catch (error) {

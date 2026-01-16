@@ -3,12 +3,16 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import ResponseService from '../../../api/services/response.service';
 import InviteService from '../../../api/services/invite.service';
 import Loader from '../../../components/common/Loader/Loader';
+import FeedbackForm from '../../../components/Surveys/FeedbackForm';
+import { useNotificationTriggers } from '../../../components/Notifications';
+import Button from '../../../components/UI/Button';
 import styles from './ResponseForm.module.scss';
 
 const PublicResponseForm = () => {
   const { token } = useParams();
   const [searchParams] = useSearchParams();
   const inviteToken = searchParams.get('invite_token');
+  const notificationTriggers = useNotificationTriggers();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -17,6 +21,8 @@ const PublicResponseForm = () => {
   const [answers, setAnswers] = useState({});
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [submittedResponseId, setSubmittedResponseId] = useState(null);
+  const sessionStartedRef = React.useRef(false);
   const [error, setError] = useState(null);
 
   const fetchSurvey = useCallback(async () => {
@@ -72,16 +78,49 @@ const PublicResponseForm = () => {
       const initialAnswers = {};
       surveyData.questions.forEach(q => {
         // Checkbox needs array, others need empty string or null
-        if (q.type === 'checkbox') {
+        if (q.type === 'checkbox' || q.type === 'multiple_choice') {
           initialAnswers[q.id] = [];
         } else {
           initialAnswers[q.id] = '';
         }
       });
       setAnswers(initialAnswers);
-    } catch (error) {
-      console.error('Error fetching survey:', error);
-      setError(error.response?.data?.message || 'Failed to load survey');
+
+      // IDEMPOTENCY: Generate client response ID immediately, but DO NOT start session on backend yet
+      // Use TOKEN in key to scope session to this specific link/collector
+      const storageKey = `survey_client_response_${token}`;
+      let clientResponseId = localStorage.getItem(storageKey);
+
+      if (!clientResponseId) {
+        // Generate UUID v4 for both public and private surveys
+        clientResponseId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          var r = Math.random() * 16 | 0;
+          var v = c === 'x' ? r : ((r & 0x3) | 0x8);
+          return v.toString(16);
+        });
+        localStorage.setItem(storageKey, clientResponseId);
+        localStorage.setItem(storageKey, clientResponseId);
+      }
+
+      // START SESSION (Frontend-driven timing)
+      // Only start if not already started in this component instance
+      if (!sessionStartedRef.current) {
+        sessionStartedRef.current = true;
+        // Fire and forget (don't block UI)
+        ResponseService.startSession(
+          surveyData.id,
+          token, // collector token
+          localStorage.getItem(`survey_session_${token}`), // session_id (optional)
+          clientResponseId
+        ).then(res => {
+          console.log('[ResponseForm] Session started:', res);
+        }).catch(err => {
+          console.error('[ResponseForm] Failed to start session:', err);
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching survey:', err);
+      setError(err.response?.data?.message || 'Failed to load survey');
     } finally {
       setLoading(false);
     }
@@ -116,16 +155,18 @@ const PublicResponseForm = () => {
   // Get question type display name with details
   const getQuestionTypeDisplay = (question) => {
     const typeMap = {
-      'open_ended': 'Text Response',
-      'multiple_choice': 'Single Choice',
-      'checkbox': 'Multiple Choice',
+      'open_ended': 'Text Response (Long)',
+      'text': 'Text Response (Short)',
+      'single_choice': 'Single Choice',
+      'multiple_choice': 'Multiple Choice (Checkbox)',
+      'checkbox': 'Multiple Choice (Checkbox)',
       'dropdown': 'Dropdown',
       'rating': 'Rating Scale',
       'boolean': 'Yes/No',
       'number': 'Number',
       'email': 'Email',
       'date': 'Date',
-      'likert_scale': 'Rating Scale (1-5)'
+      'likert_scale': 'Likert Scale'
     };
 
     const baseType = typeMap[question.type] || 'Response';
@@ -155,8 +196,8 @@ const PublicResponseForm = () => {
   };
 
   const handleAnswerChange = (questionId, value, questionType) => {
-    // For checkbox type - handle multiple selections
-    if (questionType === 'checkbox') {
+    // For checkbox / multiple_choice type - handle multiple selections
+    if (questionType === 'checkbox' || questionType === 'multiple_choice') {
       const currentAnswers = answers[questionId] || [];
       const newAnswers = currentAnswers.includes(value)
         ? currentAnswers.filter(v => v !== value)
@@ -173,13 +214,13 @@ const PublicResponseForm = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
 
-    if (!validateAnswers()) {
-      return;
-    }
 
+  // Removed unused warning modal state variables
+
+  // Removed unused functions for incomplete warning modal functionality
+
+  const submitResponse = async () => {
     try {
       setSubmitting(true);
 
@@ -190,7 +231,10 @@ const PublicResponseForm = () => {
       }));
 
       const submissionData = {
-        answers: formattedAnswers
+        answers: formattedAnswers,
+        response_id: submittedResponseId,
+        session_id: localStorage.getItem(`survey_session_${token}`), // Legacy session ID (optional)
+        client_response_id: localStorage.getItem(`survey_client_response_${token}`) // CRITICAL: Idempotency Key
       };
 
       // Include invite token if this is a private survey
@@ -198,10 +242,30 @@ const PublicResponseForm = () => {
         submissionData.invite_token = inviteToken;
       }
 
+      console.log('Submission data:', submissionData);
+
       const response = await ResponseService.submitPublicResponse(token, submissionData);
 
-      if (response.ok) {
+      if (response && response.success) { // Check for success flag from backend
         setSubmitted(true);
+
+        // Send survey response notification
+        if (survey?.workspace_id) {
+          await notificationTriggers.sendSurveyResponseNotification(
+            survey.id,
+            response.data?.response_id,
+            survey.workspace_id
+          );
+        }
+
+        // CLEANUP: Remove local storage keys to allow fresh start next time (if revisited)
+        localStorage.removeItem(`survey_client_response_${token}`);
+        localStorage.removeItem(`survey_session_${token}`);
+
+        // data structure: { success: true, data: { response_id: 123 } }
+        if (response.data && response.data.response_id) {
+          setSubmittedResponseId(response.data.response_id);
+        }
       } else {
         setError(response.message || 'Failed to submit response');
       }
@@ -211,6 +275,25 @@ const PublicResponseForm = () => {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (submitting) return; // Guard against double-submit
+
+    if (!validateAnswers()) {
+      // If validation fails (required questions missing), auto-scroll to first error
+      const requiredQ = survey.questions.find(q => q.required && (!answers[q.id] || (Array.isArray(answers[q.id]) && answers[q.id].length === 0)));
+      if (requiredQ) {
+        const el = document.getElementById(`question-${requiredQ.id}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
+    // Proceed to submit if no skips
+    await submitResponse();
   };
 
   const renderQuestion = (question, index) => {
@@ -241,19 +324,31 @@ const PublicResponseForm = () => {
           </div>
         </div>
 
-        {/* Open Ended - Text area */}
-        {question.type === 'open_ended' && (
-          <textarea
-            value={answer || ''}
-            onChange={(e) => handleAnswerChange(question.id, e.target.value, question.type)}
-            className={`${styles.textarea} ${hasError ? styles.inputError : ''}`}
-            placeholder="Your answer..."
-            rows={4}
-          />
+        {/* Open Ended / Text - Text area or input */}
+        {(question.type === 'open_ended' || question.type === 'text') && (
+          <>
+            {question.type === 'open_ended' ? (
+              <textarea
+                value={answer || ''}
+                onChange={(e) => handleAnswerChange(question.id, e.target.value, question.type)}
+                className={`${styles.textarea} ${hasError ? styles.inputError : ''}`}
+                placeholder="Your answer..."
+                rows={4}
+              />
+            ) : (
+              <input
+                type="text"
+                value={answer || ''}
+                onChange={(e) => handleAnswerChange(question.id, e.target.value, question.type)}
+                className={`${styles.input} ${hasError ? styles.inputError : ''}`}
+                placeholder="Your answer..."
+              />
+            )}
+          </>
         )}
 
-        {/* Multiple Choice - Radio buttons (single selection) */}
-        {question.type === 'multiple_choice' && (
+        {/* Single Choice - Radio buttons */}
+        {question.type === 'single_choice' && (
           <div className={styles.optionsList}>
             {(question.options || []).map((option) => (
               <label key={option.id} className={styles.optionLabel}>
@@ -271,8 +366,8 @@ const PublicResponseForm = () => {
           </div>
         )}
 
-        {/* Checkbox - Multiple selections */}
-        {question.type === 'checkbox' && (
+        {/* Multiple Choice / Checkbox - Checkbox inputs */}
+        {(question.type === 'multiple_choice' || question.type === 'checkbox') && (
           <div className={styles.optionsList}>
             {(question.options || []).map((option) => (
               <label key={option.id} className={styles.optionLabel}>
@@ -321,6 +416,82 @@ const PublicResponseForm = () => {
           </div>
         )}
 
+        {/* Rating - Numeric rating */}
+        {question.type === 'rating' && (
+          <div className={styles.ratingScale}>
+            {[1, 2, 3, 4, 5].map((rating) => (
+              <button
+                key={rating}
+                type="button"
+                onClick={() => handleAnswerChange(question.id, rating, question.type)}
+                className={`${styles.ratingButton} ${String(answer) === String(rating) ? styles.ratingSelected : ''}`}
+              >
+                {rating}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Boolean - Yes/No */}
+        {question.type === 'boolean' && (
+          <div className={styles.optionsList}>
+            <label className={styles.optionLabel}>
+              <input
+                type="radio"
+                name={`question-${question.id}`}
+                value="true"
+                checked={String(answer) === 'true'}
+                onChange={() => handleAnswerChange(question.id, 'true', question.type)}
+                className={styles.radioInput}
+              />
+              <span>Yes</span>
+            </label>
+            <label className={styles.optionLabel}>
+              <input
+                type="radio"
+                name={`question-${question.id}`}
+                value="false"
+                checked={String(answer) === 'false'}
+                onChange={() => handleAnswerChange(question.id, 'false', question.type)}
+                className={styles.radioInput}
+              />
+              <span>No</span>
+            </label>
+          </div>
+        )}
+
+        {/* Number Input */}
+        {question.type === 'number' && (
+          <input
+            type="number"
+            value={answer || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value, question.type)}
+            className={`${styles.input} ${hasError ? styles.inputError : ''}`}
+            placeholder="Enter a number..."
+          />
+        )}
+
+        {/* Email Input */}
+        {question.type === 'email' && (
+          <input
+            type="email"
+            value={answer || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value, question.type)}
+            className={`${styles.input} ${hasError ? styles.inputError : ''}`}
+            placeholder="your.email@example.com"
+          />
+        )}
+
+        {/* Date Input */}
+        {question.type === 'date' && (
+          <input
+            type="date"
+            value={answer || ''}
+            onChange={(e) => handleAnswerChange(question.id, e.target.value, question.type)}
+            className={`${styles.input} ${hasError ? styles.inputError : ''}`}
+          />
+        )}
+
         {hasError && <div className={styles.errorMessage}>{hasError}</div>}
       </div>
     );
@@ -347,6 +518,14 @@ const PublicResponseForm = () => {
         <div className={styles.successDetails}>
           <p>We appreciate you taking the time to complete this survey.</p>
         </div>
+
+        {submittedResponseId && survey && (
+          <FeedbackForm
+            surveyId={survey.id}
+            responseId={submittedResponseId}
+            onComplete={() => console.log('Feedback process completed')}
+          />
+        )}
       </div>
     );
   }
@@ -410,13 +589,13 @@ const PublicResponseForm = () => {
           </div>
 
           <div className={styles.submitSection}>
-            <button
+            <Button
               type="submit"
-              disabled={submitting}
-              className={styles.submitButton}
+              loading={submitting}
+              size="lg"
             >
-              {submitting ? 'Submitting...' : 'Submit Response'}
-            </button>
+              Submit Response
+            </Button>
           </div>
         </form>
 

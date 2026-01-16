@@ -1,0 +1,68 @@
+.authContainer {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #f9fafb; // Neutral background
+    padding: 2rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.authCard {
+    width: 100%;
+    max-width: 440px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    padding: 2.5rem;
+    border: 1px solid #f3f4f6;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.logoPlaceholder {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    font-size: 0.95rem;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.footerLinks {
+    margin-top: 2rem;
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+
+    a {
+        color: #6b7280;
+        text-decoration: none;
+        transition: color 0.2s;
+
+        &:hover {
+            color: #111827;
+        }
+    }
+}

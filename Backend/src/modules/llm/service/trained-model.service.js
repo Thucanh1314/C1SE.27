@@ -2,9 +2,55 @@ const axios = require('axios');
 const logger = require('../../../../src/utils/logger');
 
 class TrainedModelService {
-    constructor() {
+    constructor(user = null) {
         this.apiUrl = process.env.TRAINED_MODEL_API_URL || 'http://localhost:8001/api';
         this.timeout = 30000;
+        this.user = user; // Store user for permission checks
+    }
+
+    /**
+     * Check if user has permission to use AI features
+     * Only 'creator' role can access AI features
+     */
+    async checkAIPermission() {
+        if (!this.user) {
+            throw new Error('User authentication required for AI features');
+        }
+
+        // 1. Allow global Admin & Creator
+        if (['admin', 'creator'].includes(this.user.role)) {
+            return;
+        }
+
+        // 2. Allow Collaborator/Owner role in any workspace
+        const { WorkspaceMember } = require('../../../../src/models');
+        try {
+            const membership = await WorkspaceMember.findOne({
+                where: {
+                    user_id: this.user.id,
+                    role: ['owner', 'collaborator']
+                }
+            });
+
+            if (membership) {
+                return; // User is an authorized workspace manager
+            }
+        } catch (dbError) {
+            logger.error('Error checking workspace membership for AI permission:', dbError);
+        }
+
+        // Deny access if no criteria met
+        logger.warn(`AI access denied: User ${this.user.id} (role: ${this.user.role}) attempted to use AI features`, {
+            userId: this.user.id,
+            userRole: this.user.role,
+            feature: 'AI API (Port 8001)'
+        });
+
+        const error = new Error('Vui lòng nâng cấp lên Creator hoặc tham gia Workspace với tư cách Collaborator để sử dụng tính năng AI');
+        error.code = 'AI_ACCESS_DENIED';
+        error.userRole = this.user.role;
+        error.requiredRole = 'creator/collaborator';
+        throw error;
     }
 
     async checkHealth() {
@@ -33,6 +79,9 @@ class TrainedModelService {
 
     async generateQuestions(keyword, numQuestions = 5, category = null) {
         try {
+            // Check AI permission before making request
+            this.checkAIPermission();
+
             const payload = {
                 keyword: keyword,
                 num_questions: numQuestions
@@ -42,7 +91,7 @@ class TrainedModelService {
                 payload.category = category;
             }
 
-            logger.info(`Generating questions for keyword: ${keyword}`);
+            logger.info(`Generating questions for keyword: ${keyword} by user ${this.user?.id}`);
 
             const response = await axios.post(`${this.apiUrl}/questions/generate`, payload, {
                 headers: {
@@ -53,9 +102,21 @@ class TrainedModelService {
 
             return response.data;
         } catch (error) {
+            // Handle permission errors specially
+            if (error.code === 'AI_ACCESS_DENIED') {
+                return {
+                    success: false,
+                    error: error.message,
+                    reason: 'AI_ACCESS_DENIED',
+                    userRole: error.userRole,
+                    requiredRole: error.requiredRole,
+                    questions: []
+                };
+            }
+
             logger.error('Question generation failed:', error.message);
-            return { 
-                success: false, 
+            return {
+                success: false,
                 error: error.response?.data?.error || error.message,
                 questions: []
             };
@@ -64,6 +125,9 @@ class TrainedModelService {
 
     async predictCategory(keyword) {
         try {
+            // Check AI permission before making request
+            this.checkAIPermission();
+
             const response = await axios.post(`${this.apiUrl}/predict/category`, {
                 keyword: keyword
             }, {
@@ -75,16 +139,30 @@ class TrainedModelService {
 
             return response.data;
         } catch (error) {
+            // Handle permission errors specially
+            if (error.code === 'AI_ACCESS_DENIED') {
+                return {
+                    success: false,
+                    error: error.message,
+                    reason: 'AI_ACCESS_DENIED',
+                    userRole: error.userRole,
+                    requiredRole: error.requiredRole
+                };
+            }
+
             logger.error('Category prediction failed:', error.message);
-            return { 
-                success: false, 
-                error: error.response?.data?.error || error.message 
+            return {
+                success: false,
+                error: error.response?.data?.error || error.message
             };
         }
     }
 
     async batchGenerateQuestions(keywords, numQuestions = 5) {
         try {
+            // Check AI permission before making request
+            this.checkAIPermission();
+
             const response = await axios.post(`${this.apiUrl}/questions/batch`, {
                 keywords: keywords,
                 num_questions: numQuestions
@@ -97,10 +175,21 @@ class TrainedModelService {
 
             return response.data;
         } catch (error) {
+            // Handle permission errors specially
+            if (error.code === 'AI_ACCESS_DENIED') {
+                return {
+                    success: false,
+                    error: error.message,
+                    reason: 'AI_ACCESS_DENIED',
+                    userRole: error.userRole,
+                    requiredRole: error.requiredRole
+                };
+            }
+
             logger.error('Batch question generation failed:', error.message);
-            return { 
-                success: false, 
-                error: error.response?.data?.error || error.message 
+            return {
+                success: false,
+                error: error.response?.data?.error || error.message
             };
         }
     }

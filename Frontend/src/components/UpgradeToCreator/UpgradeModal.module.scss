@@ -1,0 +1,314 @@
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.modal {
+    background: white;
+    width: 100%;
+    max-width: 520px;
+    border-radius: 12px;
+    padding: 32px;
+    position: relative;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.closeButton {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    transition: color 0.2s;
+
+    &:hover {
+        color: #333;
+    }
+}
+
+/* Header Styles */
+.header {
+    margin-bottom: 28px;
+
+    h2 {
+        margin: 0 0 8px 0;
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1a1a1a;
+    }
+}
+
+.subtitle {
+    color: #666;
+    margin: 0 0 6px 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.sla {
+    color: #999;
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+/* Form Styles */
+.formGroup {
+    margin-bottom: 24px;
+
+    label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: 500;
+        color: #333;
+        font-size: 0.9rem;
+    }
+}
+
+/* Card Grid for Usage Selection */
+.cardGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    font-size: 0.9rem;
+
+    &:hover {
+        border-color: #d4d4d4;
+        background: #fafafa;
+    }
+
+    &:focus {
+        outline: none;
+        border-color: #000;
+    }
+}
+
+.cardSelected {
+    border-color: #000;
+    background: #fafafa;
+    box-shadow: 0 0 0 1px #000;
+}
+
+.cardIcon {
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cardLabel {
+    font-weight: 500;
+    color: #333;
+}
+
+/* Textarea */
+textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+    transition: border-color 0.2s;
+
+    &:focus {
+        outline: none;
+        border-color: #000;
+    }
+
+    &::placeholder {
+        color: #999;
+    }
+}
+
+/* Checkbox */
+.checkboxGroup {
+    margin-bottom: 24px;
+
+    label {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: #444;
+        line-height: 1.4;
+        font-weight: normal;
+    }
+
+    input {
+        margin-top: 3px;
+        cursor: pointer;
+    }
+}
+
+/* Actions */
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 28px;
+}
+
+.primaryBtn,
+.secondaryBtn {
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.primaryBtn {
+    background: #000;
+    color: white;
+
+    &:hover:not(:disabled) {
+        background: #333;
+    }
+
+    &:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+}
+
+.secondaryBtn {
+    background: transparent;
+    color: #666;
+    border: 1.5px solid #e5e5e5;
+
+    &:hover:not(:disabled) {
+        background: #fafafa;
+        border-color: #d4d4d4;
+    }
+}
+
+/* Status View Styles */
+.loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+}
+
+.statusView {
+    text-align: center;
+    padding: 20px 0;
+
+    p {
+        color: #666;
+        line-height: 1.6;
+        margin: 12px 0;
+    }
+}
+
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    margin-bottom: 16px;
+}
+
+.pending {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.approved {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.rejected {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+.rejectionInfo {
+    background: #fafafa;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 16px 0;
+    text-align: left;
+    border: 1px solid #e5e5e5;
+}
+
+.adminComment {
+    margin: 12px 0;
+    font-size: 0.9rem;
+    color: #555;
+    padding: 12px;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e5e5e5;
+
+    strong {
+        display: block;
+        margin-bottom: 6px;
+        color: #333;
+    }
+}
+
+.retryBtn {
+    background: white;
+    border: 1.5px solid #e5e5e5;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s;
+
+    &:hover {
+        border-color: #000;
+        background: #fafafa;
+    }
+}

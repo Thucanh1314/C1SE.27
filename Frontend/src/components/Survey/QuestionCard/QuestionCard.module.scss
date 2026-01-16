@@ -1,0 +1,163 @@
+@use '../../../styles/variables' as *;
+
+.questionCard {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.2s;
+
+  &:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.titleSection {
+  display: flex;
+  gap: 0.75rem;
+  flex: 1;
+}
+
+.questionNumber {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #14B8A6;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.questionText {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.5;
+}
+
+.required {
+  color: #ef4444;
+  margin-left: 0.25rem;
+}
+
+.questionType {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  border-radius: 6px;
+  text-transform: capitalize;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.editButton,
+.deleteButton {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: #f3f4f6;
+  }
+}
+
+.editButton {
+  color: $primary;
+
+  &:hover {
+    border-color: $primary;
+  }
+}
+
+.deleteButton {
+  color: #ef4444;
+
+  &:hover {
+    border-color: #ef4444;
+  }
+}
+
+.content {
+  margin-top: 1rem;
+}
+
+// Likert Scale styles
+.likertScale {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+
+  @media (max-width: 640px) {
+    gap: 0.5rem;
+  }
+}
+
+.likertOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+
+  input {
+    margin: 0;
+    cursor: not-allowed;
+  }
+
+  span {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #6b7280;
+  }
+}
+
+// Open-ended input
+.openEndedInput {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: all 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: #14B8A6;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  }
+
+  &:disabled {
+    background: #f9fafb;
+    cursor: not-allowed;
+  }
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+}

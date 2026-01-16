@@ -6,7 +6,7 @@
 
 require('dotenv').config();
 const bcrypt = require('bcrypt');
-const { sequelize, initializeDatabase, User, QuestionType } = require('../src/models');
+const { sequelize, User, QuestionType } = require('../src/models');
 
 const logger = console;
 
@@ -16,7 +16,7 @@ async function seed() {
 
     // Initialize database
     logger.log('📍 Initializing database...');
-    await initializeDatabase();
+    await sequelize.sync();
 
     // Seed question types
     logger.log('📍 Seeding question types...');

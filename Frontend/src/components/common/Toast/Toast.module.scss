@@ -1,4 +1,6 @@
 // Toast.module.scss
+@use '../../../styles/variables' as *;
+
 .toastContainer {
   position: fixed;
   top: 1rem;
@@ -26,22 +28,34 @@
 
   &.success {
     border-left-color: #14B8A6;
-    .icon { color: #14B8A6; }
+
+    .icon {
+      color: #14B8A6;
+    }
   }
 
   &.error {
     border-left-color: #ef4444;
-    .icon { color: #ef4444; }
+
+    .icon {
+      color: #ef4444;
+    }
   }
 
   &.warning {
     border-left-color: #f59e0b;
-    .icon { color: #f59e0b; }
+
+    .icon {
+      color: #f59e0b;
+    }
   }
 
   &.info {
-    border-left-color: #3b82f6;
-    .icon { color: #3b82f6; }
+    border-left-color: $primary;
+
+    .icon {
+      color: $primary;
+    }
   }
 }
 
@@ -77,6 +91,7 @@
     opacity: 0;
     transform: translateX(100%);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);

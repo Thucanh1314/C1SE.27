@@ -20,6 +20,17 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: true,
       },
+      session_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: 'Unique session identifier for anonymous users to prevent duplicates'
+      },
+      client_response_id: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        comment: 'Unique Idempotency Key from client to strictly prevent duplicates',
+        unique: 'survey_client_response_index' // Hint for Sequelize sync/indexing
+      },
       start_time: {
         type: DataTypes.DATE,
         allowNull: true,
@@ -28,9 +39,24 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
+      first_interaction_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Timestamp of the first interaction/answer'
+      },
+      last_interaction_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        comment: 'Timestamp of the most recent interaction/answer'
+      },
       status: {
         type: DataTypes.ENUM('started', 'completed', 'abandoned'),
         defaultValue: 'started',
+      },
+      time_taken: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        comment: 'Time taken in seconds'
       },
       // Identity tracking fields for Survey Access Control
       is_anonymous: {

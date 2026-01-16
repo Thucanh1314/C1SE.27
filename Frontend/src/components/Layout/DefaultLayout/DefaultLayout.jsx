@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import socketService from '../../../api/services/socket.service';
+import { useAuth } from '../../../contexts/AuthContext';
 import styles from './DefaultLayout.module.scss';
 
 /**
@@ -11,6 +13,14 @@ import styles from './DefaultLayout.module.scss';
  */
 const DefaultLayout = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { state } = useAuth();
+
+  // Initialize socket service when user is authenticated
+  useEffect(() => {
+    if (state.isAuthenticated && state.user) {
+      socketService.init();
+    }
+  }, [state.isAuthenticated, state.user]);
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);

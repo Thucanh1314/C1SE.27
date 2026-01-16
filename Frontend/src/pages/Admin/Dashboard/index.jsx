@@ -10,7 +10,8 @@ import {
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 } from 'chart.js';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import { useToast } from '../../../contexts/ToastContext';
@@ -33,13 +34,14 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { showError } = useToast();
-  
+
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -229,22 +231,22 @@ const AdminDashboard = () => {
           <p className={styles.subtitle}>Overview of system statistics and analytics</p>
         </div>
         <div className={styles.actions}>
-          <button 
+          <button
             className={styles.actionButton}
             onClick={() => navigate('/admin/users')}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M4 17a6 6 0 0112 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M4 17a6 6 0 0112 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             Manage Users
           </button>
-          <button 
+          <button
             className={styles.primaryButton}
             onClick={() => navigate('/templates')}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 5v10M5 10h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              <path d="M10 5v10M5 10h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
             Create Template
           </button>

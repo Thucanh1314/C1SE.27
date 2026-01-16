@@ -8,12 +8,16 @@ import TextArea from '../../UI/TextArea';
 import Modal from '../../UI/Modal';
 import styles from './SurveyQuestionEditor.module.scss';
 
+// const QUESTION_TYPE_LABELS - removed unused import
+
 const QUESTION_TYPES = [
-  { value: 'text', label: 'Văn bản' },
-  { value: 'multiple_choice', label: 'Lựa chọn đơn' },
-  { value: 'multiple_select', label: 'Lựa chọn nhiều' },
+  { value: 'text', label: 'Văn bản (ngắn)' },
+  { value: 'open_ended', label: 'Văn bản (dài)' },
+  { value: 'single_choice', label: 'Lựa chọn đơn' },
+  { value: 'multiple_choice', label: 'Lựa chọn nhiều (Checkbox)' },
   { value: 'rating', label: 'Đánh giá' },
-  { value: 'yes_no', label: 'Có/Không' }
+  { value: 'dropdown', label: 'Menu thả xuống' },
+  { value: 'likert_scale', label: 'Thang đo Likert' }
 ];
 
 const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
@@ -44,7 +48,7 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
     if (surveyId) {
       loadSurveyForEditing();
     }
-  }, [surveyId]);
+  }, [surveyId, loadSurveyForEditing]);
 
   const loadSurveyForEditing = async () => {
     try {
@@ -89,13 +93,13 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
           ? newQuestion.options.filter(opt => opt.trim())
           : undefined
       };
-      
+
       await LLMService.addSurveyQuestion(surveyId, questionData);
-      
+
       // Reload survey data to get updated information
       const updatedSurvey = await LLMService.getSurveyForEditing(surveyId);
       setSurvey(updatedSurvey.data);
-      
+
       setNewQuestion({
         question_text: '',
         question_type: 'text',
@@ -125,11 +129,11 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
       };
 
       await LLMService.updateSurveyQuestion(surveyId, editingQuestion.id, questionData);
-      
+
       // Reload survey data to get updated information
       const updatedSurvey = await LLMService.getSurveyForEditing(surveyId);
       setSurvey(updatedSurvey.data);
-      
+
       setEditingQuestion(null);
       setShowEditModal(false);
       showToast('Question updated successfully', 'success');
@@ -238,8 +242,8 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
           <p>Tổng số câu hỏi: {survey.questions?.length || 0}</p>
         </div>
         <div className={styles.headerRight}>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => setShowSettingsModal(true)}
             icon="⚙️"
           >
@@ -270,11 +274,11 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
                   </span>
                   {question.is_required && <span className={styles.required}>Bắt buộc</span>}
                 </div>
-                
+
                 <div className={styles.questionContent}>
                   <h4>{question.question_text}</h4>
                   {question.description && <p className={styles.description}>{question.description}</p>}
-                  
+
                   {question.options?.length > 0 && (
                     <div className={styles.options}>
                       <strong>Các lựa chọn:</strong>
@@ -288,16 +292,16 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
                 </div>
 
                 <div className={styles.questionActions}>
-                  <Button 
-                    variant="outline" 
-                    size="small" 
+                  <Button
+                    variant="outline"
+                    size="small"
                     onClick={() => openEditModal(question)}
                   >
                     ✏️ Edit
                   </Button>
-                  <Button 
-                    variant="danger" 
-                    size="small" 
+                  <Button
+                    variant="danger"
+                    size="small"
                     onClick={() => handleDeleteQuestion(question.id)}
                     disabled={saving}
                   >
@@ -331,14 +335,14 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
               onChange={(e) => setSurveySettings(prev => ({ ...prev, title: e.target.value }))}
               required
             />
-            
+
             <TextArea
               label="Mô tả"
               value={surveySettings.description}
               onChange={(e) => setSurveySettings(prev => ({ ...prev, description: e.target.value }))}
               rows={4}
             />
-            
+
             <Select
               label="Trạng thái"
               value={surveySettings.status}
@@ -350,7 +354,7 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
                 { value: 'completed', label: 'Completed' }
               ]}
             />
-            
+
             <div className={styles.modalActions}>
               <Button variant="outline" onClick={() => setShowSettingsModal(false)}>
                 Cancel
@@ -377,21 +381,21 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
               onChange={(e) => setNewQuestion(prev => ({ ...prev, question_text: e.target.value }))}
               required
             />
-            
+
             <Select
               label="Question Type"
               value={newQuestion.question_type}
               onChange={(e) => setNewQuestion(prev => ({ ...prev, question_type: e.target.value }))}
               options={QUESTION_TYPES}
             />
-            
+
             <TextArea
               label="Description (optional)"
               value={newQuestion.description}
               onChange={(e) => setNewQuestion(prev => ({ ...prev, description: e.target.value }))}
               rows={3}
             />
-            
+
             <div className={styles.checkboxGroup}>
               <label>
                 <input
@@ -414,9 +418,9 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
                       placeholder={`Lựa chọn ${index + 1}`}
                     />
                     {newQuestion.options.length > 1 && (
-                      <Button 
-                        variant="danger" 
-                        size="small" 
+                      <Button
+                        variant="danger"
+                        size="small"
                         onClick={() => removeOption(index)}
                       >
                         ✕
@@ -429,7 +433,7 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
                 </Button>
               </div>
             )}
-            
+
             <div className={styles.modalActions}>
               <Button variant="outline" onClick={() => setShowAddModal(false)}>
                 Cancel
@@ -456,21 +460,21 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
               onChange={(e) => setEditingQuestion(prev => ({ ...prev, question_text: e.target.value }))}
               required
             />
-            
+
             <Select
               label="Question Type"
               value={editingQuestion.question_type}
               onChange={(e) => setEditingQuestion(prev => ({ ...prev, question_type: e.target.value }))}
               options={QUESTION_TYPES}
             />
-            
+
             <TextArea
               label="Description (optional)"
               value={editingQuestion.description || ''}
               onChange={(e) => setEditingQuestion(prev => ({ ...prev, description: e.target.value }))}
               rows={3}
             />
-            
+
             <div className={styles.checkboxGroup}>
               <label>
                 <input
@@ -493,9 +497,9 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
                       placeholder={`Lựa chọn ${index + 1}`}
                     />
                     {editingQuestion.options.length > 1 && (
-                      <Button 
-                        variant="danger" 
-                        size="small" 
+                      <Button
+                        variant="danger"
+                        size="small"
                         onClick={() => removeOption(index, true)}
                       >
                         ✕
@@ -508,7 +512,7 @@ const SurveyQuestionEditor = ({ surveyId, onClose, onSurveyUpdated }) => {
                 </Button>
               </div>
             )}
-            
+
             <div className={styles.modalActions}>
               <Button variant="outline" onClick={() => setShowEditModal(false)}>
                 Cancel

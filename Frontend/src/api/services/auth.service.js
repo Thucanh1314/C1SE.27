@@ -11,7 +11,7 @@ const AuthService = {
 
     // Store tokens
     if (token) {
-      localStorage.setItem('token', token);
+      localStorage.setItem('authToken', token);
       localStorage.setItem('refreshToken', refreshToken);
       localStorage.setItem('user', JSON.stringify(user));
       setAuthToken(token);
@@ -36,9 +36,9 @@ const AuthService = {
 
     // Store tokens and user data
     if (token) {
-      sessionStorage.setItem('token', token);
-      sessionStorage.setItem('refreshToken', refreshToken);
-      sessionStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('authToken', token);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify(user));
       setAuthToken(token);
     }
 
@@ -53,7 +53,7 @@ const AuthService = {
     const { token: newToken, refreshToken: newRefreshToken } = response.data.data;
 
     if (newToken) {
-      localStorage.setItem('token', newToken);
+      localStorage.setItem('authToken', newToken);
       if (newRefreshToken) {
         localStorage.setItem('refreshToken', newRefreshToken);
       }
@@ -101,19 +101,19 @@ const AuthService = {
    * Check if user is authenticated
    */
   isAuthenticated() {
-    return !!localStorage.getItem('token');
+    return !!localStorage.getItem('authToken');
   },
 
   /**
    * Get stored user data
    */
   getCurrentUser() {
-    const userStr = sessionStorage.getItem('user');
+    const userStr = localStorage.getItem('user');
     return userStr ? JSON.parse(userStr) : null;
   },
 
   getToken() {
-    return sessionStorage.getItem('token');
+    return localStorage.getItem('authToken');
   },
 };
 

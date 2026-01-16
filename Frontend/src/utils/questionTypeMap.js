@@ -5,22 +5,28 @@
  * These should correspond to entries in the question_types table
  */
 export const QUESTION_TYPE_MAP = {
-  multiple_choice: 1,
-  checkbox: 2,
-  likert_scale: 3,
-  open_ended: 4,
-  dropdown: 5,
+  single_choice: 1,
+  multiple_choice: 2,
+  text: 3,
+  rating: 4,
+  likert_scale: 5,
+  dropdown: 6,
+  checkbox: 7,
+  open_ended: 8,
 };
 
 /**
  * Reverse map from IDs to type names
  */
 export const QUESTION_TYPE_ID_MAP = {
-  1: 'multiple_choice',
-  2: 'checkbox',
-  3: 'likert_scale',
-  4: 'open_ended',
-  5: 'dropdown',
+  1: 'single_choice',
+  2: 'multiple_choice',
+  3: 'text',
+  4: 'rating',
+  5: 'likert_scale',
+  6: 'dropdown',
+  7: 'checkbox',
+  8: 'open_ended',
 };
 
 /**
@@ -34,5 +40,5 @@ export const getTypeId = (typeName) => {
  * Get type name from type ID
  */
 export const getTypeName = (typeId) => {
-  return QUESTION_TYPE_ID_MAP[typeId] || 'multiple_choice';
+  return QUESTION_TYPE_ID_MAP[typeId] || 'text';
 };

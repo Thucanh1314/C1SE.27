@@ -4,7 +4,7 @@ const logger = require('../../../utils/logger');
 
 class CollectorController {
   /**
-   * Get collectors for survey
+   * Get collectors for survey (URL param version)
    */
   async getCollectorsBySurvey(req, res) {
     try {
@@ -18,6 +18,50 @@ class CollectorController {
       });
     } catch (error) {
       logger.error('Get collectors error:', error);
+
+      if (error.message.includes('not found')) {
+        return res.status(404).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      if (error.message.includes('Access denied')) {
+        return res.status(403).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error fetching collectors'
+      });
+    }
+  }
+
+  /**
+   * Get collectors for survey (query param version - backward compatibility)
+   */
+  async getCollectorsBySurveyQuery(req, res) {
+    try {
+      const { survey_id } = req.query;
+
+      if (!survey_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'survey_id query parameter is required'
+        });
+      }
+
+      const collectors = await collectorService.getCollectorsBySurvey(survey_id, req.user);
+
+      res.status(200).json({
+        success: true,
+        data: collectors
+      });
+    } catch (error) {
+      logger.error('Get collectors by query error:', error);
 
       if (error.message.includes('not found')) {
         return res.status(404).json({

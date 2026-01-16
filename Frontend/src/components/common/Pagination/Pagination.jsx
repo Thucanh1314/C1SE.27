@@ -4,9 +4,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 import styles from './Pagination.module.scss';
 
-const Pagination = ({ 
-  currentPage, 
-  totalPages, 
+const Pagination = ({
+  currentPage,
+  totalPages,
   onPageChange,
   totalItems,
   itemsPerPage
@@ -32,15 +32,29 @@ const Pagination = ({
     return pages;
   };
 
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+  /* 
+    DEFENSIVE CODING:
+    Ensure we have valid numbers to prevent "NaN" in UI.
+    If totalItems is 0, startItem/endItem should reflect that (0-0).
+  */
+  const safeCurrentPage = Number(currentPage) || 1;
+  const safeItemsPerPage = Number(itemsPerPage) || 10;
+  const safeTotalItems = Number(totalItems) || 0;
+
+  // Calculate raw range
+  const rawStart = (safeCurrentPage - 1) * safeItemsPerPage + 1;
+  const rawEnd = Math.min(safeCurrentPage * safeItemsPerPage, safeTotalItems);
+
+  // Clamp values for UI display
+  const startItem = safeTotalItems === 0 ? 0 : rawStart;
+  const endItem = safeTotalItems === 0 ? 0 : rawEnd;
 
   return (
     <div className={styles.paginationWrapper}>
       <div className={styles.paginationInfo}>
-        Showing {startItem} to {endItem} of {totalItems} results
+        Showing {startItem} to {endItem} of {safeTotalItems} results
       </div>
-      
+
       <div className={styles.pagination}>
         <button
           className={styles.pageButton}

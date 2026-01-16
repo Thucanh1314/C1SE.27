@@ -2,29 +2,35 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useToast } from '../../../contexts/ToastContext';
-import Loader from '../../../components/common/Loader/Loader';
+import AuthLayout from '../../../components/Layout/AuthLayout/AuthLayout';
+import Button from '../../../components/UI/Button';
 import styles from './Register.module.scss';
+import { FaGoogle } from 'react-icons/fa';
 
 function Register() {
   const navigate = useNavigate();
   const { register } = useAuth();
   const { showSuccess, showError } = useToast();
-  
+
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
     confirmPassword: '',
     full_name: '',
-    role: 'user' // Default role
+    // Removed role from formData as it's not directly sent to API as 'role' field ideally, 
+    // or we send 'user' fixed and handle intent separately.
+    // But for now, we keep intent in local state.
+    signupIntent: 'respondent'
   });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleIntentChange = (e) => {
+    setFormData({ ...formData, signupIntent: e.target.value });
   };
 
   const validateForm = () => {
@@ -32,243 +38,190 @@ function Register() {
       showError('Please fill in all required fields');
       return false;
     }
-
-    if (formData.username.length < 3) {
-      showError('Username must be at least 3 characters');
-      return false;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      showError('Please enter a valid email address');
-      return false;
-    }
-
     if (formData.password.length < 6) {
       showError('Password must be at least 6 characters');
       return false;
     }
-
     if (formData.password !== formData.confirmPassword) {
       showError('Passwords do not match');
       return false;
     }
-
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
-    
+    // Store intent for post-signup redirection
+    localStorage.setItem('SIGNUP_INTENT', formData.signupIntent);
+
     try {
+      // Always register as 'user'. Intent determines if we redirect to onboarding later.
       await register(
         formData.username,
         formData.email,
         formData.password,
         formData.full_name,
-        formData.role
+        'user' // Force role to user
       );
 
-      showSuccess('Registration successful! Redirecting to dashboard...');
-      
-      // Redirect based on role
+      showSuccess('Registration successful! Redirecting...');
+
+      // Redirect logic based on intent
       setTimeout(() => {
-        if (formData.role === 'user') {
-          navigate('/surveys');
+        if (formData.signupIntent === 'creator') {
+          navigate('/onboarding/workspace');
         } else {
-          navigate('/dashboard');
+          navigate('/surveys'); // or /dashboard
         }
       }, 1000);
     } catch (error) {
-      showError(error.message || 'Registration failed. Please try again.');
+      showError(error.message || 'Registration failed.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleBackHome = () => {
-    navigate('/');
+  const handleGoogleClick = () => {
+    // Store intent before leaving for Google OAuth
+    localStorage.setItem('SIGNUP_INTENT', formData.signupIntent);
   };
 
   return (
-    <div className={styles.registerPage}>
-     
-      <button
-        type="button"
-        className={styles.backButton}
-        onClick={handleBackHome}
-      >
-        ← Back to Home
-      </button>
+    <AuthLayout
+      title="Create Account"
+      subtitle="Join ALLMTAGS to start creating surveys."
+    >
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.formGroup}>
+          <label htmlFor="full_name">Full Name</label>
+          <input
+            type="text"
+            id="full_name"
+            name="full_name"
+            value={formData.full_name}
+            onChange={handleChange}
+            placeholder="John Doe"
+            className={styles.input}
+            disabled={isLoading}
+          />
+        </div>
 
-      <div className={styles.registerContainer}>
-        <div className={styles.registerCard}>
-          {/* Logo and Header */}
-          <div className={styles.header}>
-            <div className={styles.logo}>
-              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                <rect width="48" height="48" rx="12" fill="#10b981"/>
-                <path d="M12 18h24M12 24h24M12 30h16" stroke="white" strokeWidth="3" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <h1 className={styles.title}>Create Account</h1>
-            <p className={styles.subtitle}>Join ALLMTAGS to create and manage surveys</p>
-          </div>
+        <div className={styles.formGroup}>
+          <label htmlFor="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            placeholder="johndoe"
+            className={styles.input}
+            disabled={isLoading}
+          />
+        </div>
 
-          {/* Register Form */}
-          <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label htmlFor="full_name" className={styles.label}>
-                  Full Name <span className={styles.required}>*</span>
-                </label>
-                <input
-                  type="text"
-                  id="full_name"
-                  name="full_name"
-                  value={formData.full_name}
-                  onChange={handleChange}
-                  placeholder="John Doe"
-                  className={styles.input}
-                  disabled={isLoading}
-                  autoComplete="name"
-                />
-              </div>
+        <div className={styles.formGroup}>
+          <label htmlFor="email">Email Address</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="name@company.com"
+            className={styles.input}
+            disabled={isLoading}
+          />
+        </div>
 
-              <div className={styles.formGroup}>
-                <label htmlFor="username" className={styles.label}>
-                  Username <span className={styles.required}>*</span>
-                </label>
-                <input
-                  type="text"
-                  id="username"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  placeholder="johndoe"
-                  className={styles.input}
-                  disabled={isLoading}
-                  autoComplete="username"
-                />
-              </div>
-            </div>
+        <div className={styles.formGroup}>
+          <label htmlFor="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="create a password"
+            className={styles.input}
+            disabled={isLoading}
+          />
+        </div>
 
-            <div className={styles.formGroup}>
-              <label htmlFor="email" className={styles.label}>
-                Email Address <span className={styles.required}>*</span>
-              </label>
+        <div className={styles.formGroup}>
+          <label htmlFor="confirmPassword">Confirm Password</label>
+          <input
+            type="password"
+            id="confirmPassword"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            placeholder="confirm your password"
+            className={styles.input}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>I want to...</label>
+          <div className={styles.radioGroup} style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '5px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
               <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="john@example.com"
-                className={styles.input}
-                disabled={isLoading}
-                autoComplete="email"
+                type="radio"
+                name="signupIntent"
+                value="respondent"
+                checked={formData.signupIntent === 'respondent'}
+                onChange={handleIntentChange}
               />
-            </div>
-
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label htmlFor="password" className={styles.label}>
-                  Password <span className={styles.required}>*</span>
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Min. 6 characters"
-                  className={styles.input}
-                  disabled={isLoading}
-                  autoComplete="new-password"
-                />
-              </div>
-
-              <div className={styles.formGroup}>
-                <label htmlFor="confirmPassword" className={styles.label}>
-                  Confirm Password <span className={styles.required}>*</span>
-                </label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Re-enter password"
-                  className={styles.input}
-                  disabled={isLoading}
-                  autoComplete="new-password"
-                />
-              </div>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label htmlFor="role" className={styles.label}>
-                Account Type
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className={styles.select}
-                disabled={isLoading}
-              >
-                <option value="user">User - Take surveys</option>
-                <option value="creator">Creator - Create and manage surveys</option>
-              </select>
-              <p className={styles.hint}>
-                {formData.role === 'user' 
-                  ? 'You can participate in surveys' 
-                  : 'You can create, manage, and analyze surveys'}
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className={styles.submitButton}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader size="small" />
-                  <span>Creating account...</span>
-                </>
-              ) : (
-                'Create Account'
-              )}
-            </button>
-          </form>
-
-          {/* Login Link */}
-          <div className={styles.footer}>
-            <p className={styles.footerText}>
-              Already have an account?{' '}
-              <Link to="/login" className={styles.link}>
-                Sign in
-              </Link>
-            </p>
+              <span>Answer surveys only</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
+              <input
+                type="radio"
+                name="signupIntent"
+                value="creator"
+                checked={formData.signupIntent === 'creator'}
+                onChange={handleIntentChange}
+              />
+              <span>Create surveys</span>
+            </label>
+            <small style={{ color: '#666', fontSize: '0.85em', marginLeft: '24px' }}>
+              {formData.signupIntent === 'creator'
+                ? "You'll be asked to set up a workspace after signup."
+                : "You can simply join existing surveys."}
+            </small>
           </div>
         </div>
 
-        {/* Decorative Background */}
-        <div className={styles.background}>
-          <div className={styles.circle1}></div>
-          <div className={styles.circle2}></div>
-          <div className={styles.circle3}></div>
-        </div>
+        <Button
+          type="submit"
+          loading={isLoading}
+          className={styles.submitButton}
+        >
+          Sign Up
+        </Button>
+      </form>
+
+      <div className={styles.divider}>
+        <span>OR</span>
       </div>
-    </div>
+
+      <a
+        href="http://localhost:5000/api/auth/google"
+        className={styles.googleButton}
+        onClick={handleGoogleClick}
+      >
+        <FaGoogle />
+        Sign up with Google
+      </a>
+
+      <div className={styles.loginRow}>
+        Already have an account? <Link to="/login">Sign in</Link>
+      </div>
+    </AuthLayout>
   );
 }
 

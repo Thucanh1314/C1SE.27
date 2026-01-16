@@ -7,11 +7,14 @@
  * Map of internal question type keys to display labels
  */
 export const QUESTION_TYPE_LABELS = {
+  single_choice: 'Single Choice',
   multiple_choice: 'Multiple Choice',
-  checkbox: 'Checkbox',
-  likert_scale: 'Likert Scale (1-5)',
-  open_ended: 'Open-ended',
+  text: 'Text (Short)',
+  rating: 'Rating',
+  likert_scale: 'Likert Scale',
   dropdown: 'Dropdown',
+  checkbox: 'Checkbox',
+  open_ended: 'Open-Ended (Long)',
 };
 
 /**
@@ -21,13 +24,13 @@ export const QUESTION_TYPE_LABELS = {
  */
 export function getQuestionTypeLabel(question) {
   if (!question) return 'Unknown type';
-  
+
   // Try different possible field names
-  const typeKey = question.type || 
-                  question.question_type || 
-                  question.type_name ||
-                  question.QuestionType?.type_name;
-  
+  const typeKey = question.type ||
+    question.question_type ||
+    question.type_name ||
+    question.QuestionType?.type_name;
+
   return QUESTION_TYPE_LABELS[typeKey] || typeKey || 'Unknown type';
 }
 
@@ -38,12 +41,12 @@ export function getQuestionTypeLabel(question) {
  */
 export function getQuestionType(question) {
   if (!question) return null;
-  
-  return question.type || 
-         question.question_type || 
-         question.type_name ||
-         question.QuestionType?.type_name ||
-         null;
+
+  return question.type ||
+    question.question_type ||
+    question.type_name ||
+    question.QuestionType?.type_name ||
+    null;
 }
 
 /**

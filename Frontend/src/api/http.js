@@ -2,7 +2,9 @@
 import axios from 'axios';
 
 // API base URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api/modules';
+const API_BASE_URL = 'http://localhost:5000/api/modules'; // Hardcoded for debugging
+// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api/modules';
+console.log('[HTTP] Initialized with Base URL:', API_BASE_URL);
 
 // Create axios instance
 const http = axios.create({
@@ -60,7 +62,16 @@ http.interceptors.response.use(
     return response;
   },
   async (error) => {
-    console.error('[HTTP] Response error:', error.response?.status, error.response?.data || error.message);
+    // Error suppression to prevent console spam
+    const errorKey = `${error.response?.status}-${error.config?.url}`;
+    const now = Date.now();
+
+    // Only log if not logged recently (last 5 seconds)
+    if (!http._loggedErrors) http._loggedErrors = {};
+    if (!http._loggedErrors[errorKey] || now - http._loggedErrors[errorKey] > 5000) {
+      console.error('[HTTP] Response error:', error.response?.status, error.response?.data || error.message);
+      http._loggedErrors[errorKey] = now;
+    }
 
     const originalRequest = error.config;
 

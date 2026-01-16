@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import NotificationBell from '../../UI/NotificationBell';
+import { NotificationCenter } from '../../Notifications';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import UpgradeModal from '../../UpgradeToCreator/UpgradeModal';
 import styles from './Navbar.module.scss';
 
 const Navbar = ({ onToggleSidebar }) => {
@@ -10,6 +11,7 @@ const Navbar = ({ onToggleSidebar }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -33,8 +35,8 @@ const Navbar = ({ onToggleSidebar }) => {
   const getRoleBadgeColor = (role) => {
     switch (role) {
       case 'admin': return '#ef4444';
-      case 'creator': return '#3b82f6';
-      case 'user': return '#10b981';
+      case 'creator': return '#14B8A6';
+      case 'user': return '#14B8A6';
       default: return '#6b7280';
     }
   };
@@ -53,7 +55,7 @@ const Navbar = ({ onToggleSidebar }) => {
         </button>
         <div className={styles.brand}>
           <svg className={styles.logo} width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="#10b981" />
+            <rect width="32" height="32" rx="8" fill="#14B8A6" />
             <path d="M8 12h16M8 16h16M8 20h10" stroke="white" strokeWidth="2" strokeLinecap="round" />
           </svg>
           <span className={styles.brandName}>ALLMTAGS</span>
@@ -63,7 +65,7 @@ const Navbar = ({ onToggleSidebar }) => {
       <div className={styles.navbarRight}>
         {state.user && (
           <>
-            <NotificationBell />
+            <NotificationCenter />
             <div className={styles.userSection}>
               <div
                 className={styles.userInfo}
@@ -124,7 +126,27 @@ const Navbar = ({ onToggleSidebar }) => {
                     </svg>
                     {t('settings')}
                   </button>
-                  <div className={styles.dropdownDivider}></div>
+
+                  {/* Upgrade to Creator - Only for User Role */}
+                  {state.user.role === 'user' && (
+                    <>
+                      <button
+                        className={styles.dropdownItem}
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          setShowUpgradeModal(true);
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
+                        </svg>
+                        Upgrade to Creator
+                      </button>
+                      <div className={styles.dropdownDivider}></div>
+                    </>
+                  )}
+
                   <button
                     className={`${styles.dropdownItem} ${styles.logoutButton}`}
                     onClick={handleLogout}
@@ -148,6 +170,12 @@ const Navbar = ({ onToggleSidebar }) => {
           onClick={() => setShowUserMenu(false)}
         />
       )}
+
+      {/* Upgrade to Creator Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+      />
     </nav>
   );
 };

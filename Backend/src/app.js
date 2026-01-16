@@ -5,15 +5,25 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const http = require('http');
 const logger = require('./utils/logger');
+const SocketService = require('./services/socketService');
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const socketService = new SocketService();
+socketService.initialize(server);
+
+// Make socket service available to routes
+app.set('socketService', socketService);
 
 // Security middleware
 app.use(helmet());
 
 // CORS configuration with environment-based origins
-const allowedOrigins = process.env.CORS_ORIGIN 
+const allowedOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
   : [process.env.FRONTEND_URL || 'http://localhost:3000'];
 
@@ -41,6 +51,22 @@ app.get('/health', (req, res) => {
 const moduleRoutes = require('./routes/modules.routes');
 app.use('/api/modules', moduleRoutes);
 
+// ALIAS: Mount /api/auth for Google OAuth compatibility (requested by frontend)
+const authRoutes = require('./modules/auth-rbac/routes/auth.routes');
+app.use('/api/auth', authRoutes);
+
+// Context routes for borrowed powers and role-based UI
+const contextRoutes = require('./modules/auth/routes/context.routes');
+app.use('/api/auth', contextRoutes);
+
+// Leave workspace routes
+const leaveWorkspaceRoutes = require('./modules/workspaces/routes/leaveWorkspace.routes');
+app.use('/api/workspaces', leaveWorkspaceRoutes);
+
+// Advanced notification routes
+const advancedNotificationRoutes = require('./modules/notifications/routes/advancedNotification.routes');
+app.use('/api/notifications', advancedNotificationRoutes);
+
 // Root route for compatibility
 app.get('/', (req, res) => {
   res.json({
@@ -58,7 +84,7 @@ app.get('/', (req, res) => {
 app.use((err, req, res, next) => {
   console.error('[API ERROR]', err);
   logger.error(err.stack);
-  
+
   const status = err.status || err.statusCode || 500;
   const payload = {
     success: false,
@@ -68,7 +94,7 @@ app.use((err, req, res, next) => {
     message: err.message || 'Internal Server Error',
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   };
-  
+
   res.status(status).json(payload);
 });
 
@@ -81,4 +107,4 @@ app.use((req, res) => {
   });
 });
 
-module.exports = app;
+module.exports = { app, server, socketService };

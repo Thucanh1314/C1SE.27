@@ -4,9 +4,11 @@ import TemplateService from '../../../api/services/template.service';
 import QuestionService from '../../../api/services/question.service';
 import Loader from '../../../components/common/Loader/Loader';
 import Modal from '../../../components/common/Modal/Modal';
-import QuestionCard from '../../../components/UI/QuestionCard';
+import QuestionCard from '../../../components/Survey/QuestionCard';
 import { useToast } from '../../../contexts/ToastContext';
 import styles from './TemplateEditor.module.scss';
+import { QUESTION_TYPE_MAP } from '../../../utils/questionTypeMap';
+import { LuCircleCheck, LuLock, LuFilePlus } from 'react-icons/lu';
 
 const TemplateEditor = () => {
   const { id } = useParams();
@@ -18,7 +20,7 @@ const TemplateEditor = () => {
   const [saving, setSaving] = useState(false);
   const [template, setTemplate] = useState({ title: '', description: '' });
   const [questions, setQuestions] = useState([]);
-  
+
   // Question modal state
   const [showQuestionModal, setShowQuestionModal] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState(null);
@@ -48,16 +50,16 @@ const TemplateEditor = () => {
 
   const fetchTemplateData = useCallback(async () => {
     if (!id || id === 'new') return;
-    
+
     try {
       setLoading(true);
       const response = await TemplateService.getById(id);
-      
+
       if (response && response.ok) {
         const templateData = response.template;
-        setTemplate({ 
-          title: templateData?.title || '', 
-          description: templateData?.description || '' 
+        setTemplate({
+          title: templateData?.title || '',
+          description: templateData?.description || ''
         });
         setQuestions(response.questions || []);
       } else {
@@ -91,7 +93,7 @@ const TemplateEditor = () => {
         showToast('Template updated successfully', 'success');
       } else {
         const response = await TemplateService.create(template);
-        
+
         if (response && response.ok && response.id) {
           showToast('Template created successfully', 'success');
           // Navigate to edit page with the new template ID
@@ -127,7 +129,7 @@ const TemplateEditor = () => {
       question_type: question.type || question.question_type || 'multiple_choice',
       is_required: question.required !== undefined ? question.required : question.is_required,
       display_order: question.display_order || 0,
-      options: question.options && question.options.length > 0 
+      options: question.options && question.options.length > 0
         ? question.options.map(opt => opt.text || opt.option_text || '')
         : ['', ''],
     });
@@ -168,7 +170,7 @@ const TemplateEditor = () => {
       if (typesNeedingOptions.includes(questionForm.question_type)) {
         payload.options = questionForm.options.filter(opt => opt.trim() !== '');
       }
-      
+
       if (editingQuestion) {
         await QuestionService.update(editingQuestion.id, payload);
         showToast('Question updated successfully', 'success');
@@ -181,7 +183,7 @@ const TemplateEditor = () => {
           throw new Error(response?.message || 'Failed to add question');
         }
       }
-      
+
       setShowQuestionModal(false);
       fetchTemplateData();
     } catch (error) {
@@ -189,17 +191,10 @@ const TemplateEditor = () => {
       showToast(error.response?.data?.message || error.message || 'Failed to save question', 'error');
     }
   };
-  
+
   // Helper function to map question type string to ID
   const getQuestionTypeId = (typeName) => {
-    const typeMap = {
-      'multiple_choice': 1,
-      'checkbox': 2,
-      'likert_scale': 3,
-      'open_ended': 4,
-      'dropdown': 5
-    };
-    return typeMap[typeName] || 1;
+    return QUESTION_TYPE_MAP[typeName] || 1;
   };
 
   // Helper functions for managing options
@@ -227,7 +222,8 @@ const TemplateEditor = () => {
     });
   };
 
-  const questionTypesWithOptions = ['multiple_choice', 'checkbox', 'dropdown'];
+  // Types that require options
+  const questionTypesWithOptions = ['single_choice', 'multiple_choice', 'dropdown', 'checkbox', 'ranking', 'likert_scale']; // Added single_choice, ranking
 
   const handleDeleteQuestion = async (questionId) => {
     setConfirmModal({
@@ -273,7 +269,7 @@ const TemplateEditor = () => {
 
     try {
       const payload = { ...optionForm, question_id: currentQuestionId };
-      
+
       if (editingOption) {
         await QuestionService.updateOption(editingOption.id, payload);
         showToast('Option updated successfully', 'success');
@@ -281,7 +277,7 @@ const TemplateEditor = () => {
         await QuestionService.addOption(payload);
         showToast('Option added successfully', 'success');
       }
-      
+
       setShowOptionModal(false);
       fetchTemplateData();
     } catch (error) {
@@ -325,11 +321,28 @@ const TemplateEditor = () => {
         </button>
       </div>
 
+      {/* Step Indicator */}
+      <div className={styles.stepIndicator}>
+        <div className={`${styles.step} ${isEditMode ? styles.completed : styles.active}`}>
+          <div className={styles.stepNumber}>
+            {isEditMode ? <LuCircleCheck size={18} /> : '1'}
+          </div>
+          <span>Template Details</span>
+        </div>
+        <div className={`${styles.stepLine} ${isEditMode ? styles.active : ''}`} />
+        <div className={`${styles.step} ${isEditMode ? styles.active : ''}`}>
+          <div className={styles.stepNumber}>
+            {isEditMode ? '2' : <LuLock size={16} />}
+          </div>
+          <span>Questions</span>
+        </div>
+      </div>
+
       <div className={styles.content}>
         <div className={styles.sidebar}>
           <div className={styles.templateInfo}>
             <h2 className={styles.sectionTitle}>Template Details</h2>
-            
+
             <div className={styles.formGroup}>
               <label>Title *</label>
               <input
@@ -337,6 +350,7 @@ const TemplateEditor = () => {
                 value={template.title}
                 onChange={(e) => setTemplate({ ...template, title: e.target.value })}
                 placeholder="Enter template title"
+                disabled={saving}
               />
             </div>
 
@@ -347,10 +361,11 @@ const TemplateEditor = () => {
                 onChange={(e) => setTemplate({ ...template, description: e.target.value })}
                 placeholder="Enter template description"
                 rows={4}
+                disabled={saving}
               />
             </div>
 
-            <button 
+            <button
               onClick={handleSaveTemplate}
               disabled={saving}
               className={styles.saveButton}
@@ -361,48 +376,57 @@ const TemplateEditor = () => {
         </div>
 
         <div className={styles.main}>
-          <div className={styles.questionsHeader}>
-            <h2 className={styles.sectionTitle}>Questions ({questions.length})</h2>
-            <button 
-              onClick={openAddQuestionModal}
-              disabled={!isEditMode}
-              className={styles.addQuestionButton}
-              title={!isEditMode ? 'Save template first to add questions' : ''}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Add Question
-            </button>
-          </div>
+          <div className={!isEditMode ? styles.lockedSection : ''}>
+            <div className={styles.questionsHeader}>
+              <h2 className={styles.sectionTitle}>Questions ({questions.length})</h2>
+              <button
+                onClick={openAddQuestionModal}
+                disabled={!isEditMode}
+                className={styles.addQuestionButton}
+                title={!isEditMode ? 'Save template first to add questions' : 'Add a new question'}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add Question
+              </button>
+            </div>
 
-          {questions.length === 0 ? (
-            <div className={styles.emptyQuestions}>
-              <div className={styles.emptyIcon}>❓</div>
-              <p>No questions added yet</p>
-              <p className={styles.emptyHint}>
-                {!isEditMode ? 'Save the template first, then add questions' : 'Click "Add Question" to get started'}
-              </p>
-            </div>
-          ) : (
-            <div className={styles.questionsList}>
-              {questions.map((question, index) => (
-                <QuestionCard
-                  key={question.id}
-                  question={question}
-                  options={question.options || []}
-                  editable
-                  onEdit={openEditQuestionModal}
-                  onDelete={handleDeleteQuestion}
-                  onEditOption={(option) => openEditOptionModal(option, question.id)}
-                  onDeleteOption={handleDeleteOption}
-                  onAddOption={() => openAddOptionModal(question.id)}
-                  index={index}
-                />
-              ))}
-            </div>
-          )}
+            {questions.length === 0 ? (
+              <div className={styles.emptyQuestions}>
+                <div className={styles.emptyIcon}>
+                  {!isEditMode ? <LuLock size={48} /> : <LuFilePlus size={48} />}
+                </div>
+                <h3>{!isEditMode ? 'Questions Locked' : 'No Questions Yet'}</h3>
+                <p>
+                  {!isEditMode
+                    ? 'Please complete Step 1: Template Details first.'
+                    : 'Start building your survey by adding questions.'}
+                </p>
+                <div className={styles.emptyHint}>
+                  {!isEditMode ? 'Save Template to Unlock' : 'Click "Add Question" button'}
+                </div>
+              </div>
+            ) : (
+              <div className={styles.questionsList}>
+                {questions.map((question, index) => (
+                  <QuestionCard
+                    key={question.id}
+                    question={question}
+                    options={question.options || []}
+                    editable
+                    onEdit={openEditQuestionModal}
+                    onDelete={handleDeleteQuestion}
+                    onEditOption={(option) => openEditOptionModal(option, question.id)}
+                    onDeleteOption={handleDeleteOption}
+                    onAddOption={() => openAddOptionModal(question.id)}
+                    index={index}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -429,11 +453,13 @@ const TemplateEditor = () => {
               value={questionForm.question_type}
               onChange={(e) => setQuestionForm({ ...questionForm, question_type: e.target.value })}
             >
-              <option value="multiple_choice">Multiple Choice</option>
-              <option value="checkbox">Checkbox</option>
+              <option value="single_choice">Single Choice (Radio)</option>
+              <option value="multiple_choice">Multiple Choice (Checkbox)</option>
+              <option value="text">Short Answer (Text)</option>
+              <option value="open_ended">Long Answer (Paragraph)</option>
               <option value="dropdown">Dropdown</option>
+              <option value="rating">Rating</option>
               <option value="likert_scale">Likert Scale</option>
-              <option value="open_ended">Open Ended</option>
             </select>
           </div>
 
@@ -537,13 +563,13 @@ const TemplateEditor = () => {
             </p>
 
             <div className={styles.modalActions}>
-              <button 
-                onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })} 
+              <button
+                onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })}
                 className={styles.cancelButton}
               >
                 {confirmModal.cancelText}
               </button>
-              <button 
+              <button
                 onClick={() => confirmModal.onConfirm && confirmModal.onConfirm()}
                 className={`${styles.submitButton} ${styles.danger}`}
               >

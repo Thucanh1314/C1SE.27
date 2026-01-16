@@ -20,35 +20,35 @@
   border: 1px solid #b39ddb;
   border-radius: 12px;
   color: #4a4a4a;
-  
+
   h4 {
     margin: 0 0 15px 0;
     color: #6a1b9a;
     font-size: 18px;
     font-weight: 600;
   }
-  
+
   p {
     margin: 10px 0;
     line-height: 1.6;
   }
-  
+
   ul {
     list-style: none;
     padding: 0;
     margin: 15px 0;
   }
-  
+
   li {
     padding: 8px 0;
     font-size: 14px;
     color: #333;
-    
+
     &:before {
       margin-right: 8px;
     }
   }
-  
+
   strong {
     color: #6a1b9a;
     font-weight: 600;
@@ -78,7 +78,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 15px;
-  
+
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
@@ -126,7 +126,7 @@
 }
 
 .grantButton:hover:not(:disabled) {
-  background: #0056b3;
+  background: #0D9488;
 }
 
 .grantButton:disabled {
@@ -186,22 +186,22 @@
   border-radius: 12px;
   text-transform: uppercase;
   font-weight: 500;
-  
+
   &.respond {
     background: #d1ecf1;
     color: #0c5460;
   }
-  
+
   &.view {
     background: #d4edda;
     color: #155724;
   }
-  
+
   &.edit {
     background: #fff3cd;
     color: #856404;
   }
-  
+
   &.manage {
     background: #f8d7da;
     color: #721c24;

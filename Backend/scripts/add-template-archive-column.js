@@ -12,22 +12,22 @@ async function addArchivedColumn() {
   try {
     console.log('Connecting to database...');
     await sequelize.authenticate();
-    console.log('✅ Connected successfully\n');
+    console.log(' Connected successfully\n');
 
     console.log('Adding is_archived column to survey_templates...');
-    
+
     await sequelize.query(`
       ALTER TABLE survey_templates 
       ADD COLUMN is_archived TINYINT(1) DEFAULT 0 AFTER status;
     `);
 
-    console.log('✅ Column added successfully\n');
+    console.log(' Column added successfully\n');
 
     console.log('Creating index for performance...');
     await sequelize.query(`
       CREATE INDEX idx_templates_archived ON survey_templates(is_archived);
     `);
-    console.log('✅ Index created successfully\n');
+    console.log(' Index created successfully\n');
 
     // Verify the column was added
     console.log('Verifying column structure:');

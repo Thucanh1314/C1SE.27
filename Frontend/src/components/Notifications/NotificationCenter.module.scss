@@ -1,0 +1,405 @@
+@import '../../styles/variables';
+
+.container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.bellButton {
+  position: relative;
+  padding: $spacing-sm;
+  color: $gray-600;
+  background: transparent;
+  border: none;
+  border-radius: $border-radius-md;
+  cursor: pointer;
+  transition: all $transition-base;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: $primary;
+    background: rgba($primary, 0.05);
+  }
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: $danger;
+  color: white;
+  font-size: 10px;
+  font-weight: $font-weight-bold;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+
+.dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 12px);
+  width: 380px;
+  background: white;
+  border-radius: $border-radius-lg;
+  box-shadow: $shadow-xl;
+  border: 1px solid $gray-200;
+  z-index: $z-dropdown;
+  overflow: hidden;
+  animation: slideIn 0.2s ease-out;
+
+  @media (max-width: $breakpoint-sm) {
+    position: fixed;
+    top: 64px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.header {
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1px solid $gray-100;
+  display: flex;
+  align-items: center;
+  justify-content: justify;
+  background: white;
+
+  h3 {
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    color: $gray-900;
+    margin: 0;
+    flex: 1;
+  }
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: $spacing-md;
+}
+
+.markAllBtn {
+  font-size: $font-size-sm;
+  color: $primary;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-weight: $font-weight-medium;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.closeBtn {
+  color: $gray-400;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: $spacing-xs;
+  border-radius: $border-radius-sm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: $gray-600;
+    background: $gray-100;
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.list {
+  max-height: 420px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $gray-200;
+    border-radius: 3px;
+  }
+}
+
+.notificationItem {
+  padding: $spacing-md;
+  border-bottom: 1px solid $gray-50;
+  display: flex;
+  gap: $spacing-md;
+  cursor: pointer;
+  transition: background $transition-fast;
+  position: relative;
+
+  &:hover {
+    background: $gray-50;
+
+    .itemRemoveBtn {
+      opacity: 1;
+    }
+  }
+
+  &.unread {
+    background: rgba($primary, 0.03);
+    border-left: 3px solid $primary;
+
+    &:hover {
+      background: rgba($primary, 0.05);
+    }
+  }
+
+  &.highPriority {
+    background: rgba($warning, 0.03);
+
+    &.unread {
+      border-left-color: $warning;
+    }
+  }
+
+  &.urgent {
+    background: rgba($danger, 0.02);
+
+    &.unread {
+      border-left-color: $danger;
+    }
+  }
+
+  &.critical {
+    background: rgba($danger, 0.05);
+
+    &.unread {
+      border-left-color: $danger;
+      border-left-width: 4px;
+    }
+  }
+}
+
+.iconWrapper {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: $border-radius-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $gray-50;
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2px;
+}
+
+.title {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $gray-900;
+  margin: 0;
+  line-height: $line-height-tight;
+}
+
+.priorityBadge {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: rgba($warning, 0.1);
+  color: $warning;
+  border-radius: 10px;
+  margin-left: $spacing-sm;
+  font-weight: $font-weight-bold;
+  text-transform: uppercase;
+
+  &.urgent {
+    background: rgba(#ff4d4f, 0.1);
+    color: #ff4d4f;
+  }
+
+  &.critical {
+    background: #ff4d4f;
+    color: white;
+  }
+}
+
+.message {
+  font-size: $font-size-sm;
+  color: $gray-600;
+  margin: $spacing-xs 0;
+  line-height: $line-height-base;
+}
+
+.itemFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: $spacing-sm;
+}
+
+.time {
+  font-size: 12px;
+  color: $gray-400;
+}
+
+.actionLink {
+  font-size: 12px;
+  color: $primary;
+  font-weight: $font-weight-medium;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.upgradePrompt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8b5cf6;
+  font-weight: 500;
+
+  .sparkleIcon {
+    flex-shrink: 0;
+  }
+}
+
+.itemActions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+}
+
+.primaryAction {
+  padding: 4px 12px;
+  background: $primary;
+  color: white;
+  border: none;
+  border-radius: $border-radius-sm;
+  font-size: 12px;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+
+  &:hover {
+    background: $primary-hover;
+  }
+}
+
+.secondaryAction {
+  padding: 4px 12px;
+  background: $gray-100;
+  color: $gray-700;
+  border: none;
+  border-radius: $border-radius-sm;
+  font-size: 12px;
+  font-weight: $font-weight-medium;
+  cursor: pointer;
+
+  &:hover {
+    background: $gray-200;
+  }
+}
+
+.itemRemoveBtn {
+  opacity: 0;
+  padding: 2px;
+  color: $gray-400;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity $transition-fast;
+
+  &:hover {
+    color: $danger;
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.emptyState {
+  padding: $spacing-2xl;
+  text-align: center;
+  color: $gray-400;
+
+  svg {
+    display: block;
+    margin: 0 auto $spacing-md;
+    width: 48px;
+    height: 48px;
+    color: $gray-200;
+  }
+
+  p {
+    font-size: $font-size-sm;
+    margin: 0;
+  }
+}
+
+.loadingState {
+  padding: $spacing-xl;
+  text-align: center;
+  color: $gray-500;
+
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid $gray-100;
+    border-top-color: $primary;
+    border-radius: 50%;
+    margin: 0 auto $spacing-sm;
+    animation: spin 1s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

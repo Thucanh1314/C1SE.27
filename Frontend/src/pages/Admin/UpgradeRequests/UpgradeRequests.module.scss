@@ -1,0 +1,300 @@
+.container {
+    padding: 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+
+    h1 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1a1a1a;
+        margin: 0;
+    }
+}
+
+.filterSelect {
+    padding: 8px 16px;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s;
+
+    &:hover {
+        border-color: #d4d4d4;
+    }
+
+    &:focus {
+        outline: none;
+        border-color: #000;
+    }
+}
+
+/* Table Styles */
+.tableWrapper {
+    background: white;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+
+    thead {
+        background: #fafafa;
+        border-bottom: 1.5px solid #e5e5e5;
+
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #666;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    }
+
+    tbody {
+        tr {
+            border-bottom: 1px solid #f5f5f5;
+            transition: background-color 0.2s;
+
+            &:hover {
+                background: #fafafa;
+            }
+
+            &:last-child {
+                border-bottom: none;
+            }
+        }
+
+        td {
+            padding: 16px;
+            color: #333;
+            vertical-align: middle;
+        }
+    }
+}
+
+/* User Info */
+.userInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.userName {
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+.userEmail {
+    font-size: 0.85rem;
+    color: #999;
+}
+
+/* Usage Badge */
+.usageBadge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #f5f5f5;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #666;
+    text-transform: capitalize;
+}
+
+/* Reason Cell */
+.reasonCell {
+    max-width: 300px;
+}
+
+.reasonText {
+    display: block;
+    color: #666;
+    line-height: 1.4;
+}
+
+/* Date Cell */
+.dateCell {
+    color: #666;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+/* Status Badge with Dot */
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.statusDot {
+    flex-shrink: 0;
+}
+
+.pending {
+    background: #fef3c7;
+    color: #92400e;
+
+    .statusDot {
+        color: #f59e0b;
+    }
+}
+
+.approved {
+    background: #d1fae5;
+    color: #065f46;
+
+    .statusDot {
+        color: #10b981;
+    }
+}
+
+.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+
+    .statusDot {
+        color: #ef4444;
+    }
+}
+
+/* Review Button */
+.reviewButton {
+    padding: 6px 16px;
+    background: white;
+    border: 1.5px solid #e5e5e5;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #333;
+
+    &:hover {
+        border-color: #000;
+        background: #fafafa;
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+}
+
+.reviewedText {
+    font-size: 0.85rem;
+    color: #999;
+}
+
+/* Loading & Empty States */
+.loading,
+.empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: #999;
+    font-size: 0.9rem;
+}
+
+/* Pagination */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin-top: 24px;
+
+    button {
+        padding: 8px 16px;
+        background: white;
+        border: 1.5px solid #e5e5e5;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover:not(:disabled) {
+            border-color: #000;
+            background: #fafafa;
+        }
+
+        &:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+    }
+
+    span {
+        font-size: 0.9rem;
+        color: #666;
+    }
+}
+
+/* Modal (Placeholder for Phase 3) */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.modal {
+    background: white;
+    padding: 32px;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+
+    h3 {
+        margin: 0 0 16px 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1a1a1a;
+    }
+
+    p {
+        color: #666;
+        margin-bottom: 20px;
+    }
+
+    button {
+        padding: 10px 20px;
+        background: #000;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+
+        &:hover {
+            background: #333;
+        }
+    }
+}

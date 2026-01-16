@@ -1,6 +1,7 @@
 // src/components/SurveyAccessControl/index.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './SurveyAccessControl.module.scss';
+import { PublicIcon, LoginIcon, PrivateIcon, InternalIcon, CheckIcon } from '../Icons';
 
 const SurveyAccessControl = ({
   surveyId,
@@ -11,322 +12,215 @@ const SurveyAccessControl = ({
 }) => {
   const [accessConfig, setAccessConfig] = useState(value);
   const [inviteEmails, setInviteEmails] = useState('');
-  const [sentInvites, setSentInvites] = useState([]);
-  const [loadingInvites, setLoadingInvites] = useState(false);
+  const [parsedEmails, setParsedEmails] = useState([]);
+  const [invalidEmails, setInvalidEmails] = useState([]);
 
+  // Sync check: only update if value deeply changes (or just access_type/workspace)
+  // We avoid syncing emails constantly from prop to prevent cursor jumps if we were controlled
+  // Sync check: only update if value deeply changes (or just access_type/workspace)
+  // We avoid syncing emails constantly from prop to prevent cursor jumps if we were controlled
   useEffect(() => {
-    setAccessConfig(value);
+    setAccessConfig(prev => {
+      if (value.access_type !== prev.access_type ||
+        value.workspace_id !== prev.workspace_id ||
+        value.require_login !== prev.require_login) {
+        return { ...prev, ...value };
+      }
+      return prev;
+    });
   }, [value]);
 
-  const fetchInvites = useCallback(async () => {
-    try {
-      setLoadingInvites(true);
-      // Dynamic import to avoid circular dependency if any
-      const InviteService = (await import('../../api/services/invite.service')).default;
-      const invites = await InviteService.getInvites(surveyId);
-      setSentInvites(invites);
-    } catch (error) {
-      console.error('Error fetching invites:', error);
-    } finally {
-      setLoadingInvites(false);
-    }
-  }, [surveyId]);
-
-  // Fetch existing invites when surveyId changes or access type is private
+  // Initial load of emails
   useEffect(() => {
-    if (surveyId && accessConfig.access_type === 'private') {
-      fetchInvites();
-    }
-  }, [surveyId, accessConfig.access_type, fetchInvites]);
+    setInviteEmails(prev => {
+      if (value.inviteEmails && !prev) {
+        return value.inviteEmails;
+      }
+      return prev;
+    });
+  }, [value.inviteEmails]);
 
-  const handleResendInvite = async (email) => {
-    try {
-      const InviteService = (await import('../../api/services/invite.service')).default;
-      await InviteService.createInvites(surveyId, [email]);
-      // Refresh list
-      fetchInvites();
-      alert(`Invitation resent to ${email}`);
-    } catch (error) {
-      console.error('Error resending invite:', error);
-      alert('Failed to resend invitation');
+  // Parse emails locally for UI feedback
+  useEffect(() => {
+    if (!inviteEmails) {
+      setParsedEmails([]);
+      setInvalidEmails([]);
+      return;
     }
+
+    const rawList = inviteEmails.split(/[\n,;]+/).map(e => e.trim()).filter(e => e.length > 0);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    const valid = [];
+    const invalid = [];
+
+    rawList.forEach(email => {
+      if (emailRegex.test(email)) valid.push(email);
+      else invalid.push(email);
+    });
+
+    setParsedEmails(valid);
+    setInvalidEmails(invalid);
+  }, [inviteEmails]);
+
+  const handleEmailBlur = () => {
+    // Sync to parent on blur to avoid render loops
+    onChange({ ...accessConfig, inviteEmails });
   };
 
   const handleAccessTypeChange = (newAccessType) => {
-    let newConfig = {
-      ...accessConfig,
-      access_type: newAccessType
-    };
+    let newConfig = { ...accessConfig, access_type: newAccessType };
 
-    // Auto-configure based on access type
     switch (newAccessType) {
       case 'public':
-        newConfig = {
-          ...newConfig,
-          require_login: false,
-          allow_anonymous: true
-        };
+        newConfig = { ...newConfig, require_login: false, allow_anonymous: true };
         break;
       case 'public_with_login':
-        newConfig = {
-          ...newConfig,
-          require_login: true,
-          allow_anonymous: false
-        };
+        newConfig = { ...newConfig, require_login: true, allow_anonymous: false };
         break;
       case 'private':
-        newConfig = {
-          ...newConfig,
-          require_login: true,
-          allow_anonymous: false
-        };
-        break;
       case 'internal':
-        newConfig = {
-          ...newConfig,
-          require_login: true,
-          allow_anonymous: false
-        };
+        newConfig = { ...newConfig, require_login: true, allow_anonymous: false };
         break;
-      default:
-        break;
+      default: break;
     }
 
     setAccessConfig(newConfig);
     onChange({ ...newConfig, inviteEmails });
-  };
-
-  const handleInviteEmailsChange = (emails) => {
-    setInviteEmails(emails);
-    onChange({ ...accessConfig, inviteEmails: emails });
   };
 
   const handleWorkspaceChange = (workspaceId) => {
     const newConfig = {
       ...accessConfig,
-      workspace_id: workspaceId ? parseInt(workspaceId) : null
+      workspace_id: workspaceId ? parseInt(workspaceId) : null,
+      access_type: (!workspaceId && accessConfig.access_type === 'internal') ? 'public' : accessConfig.access_type
     };
-
-    // If workspace is removed and access_type is internal, change to public
-    if (!workspaceId && accessConfig.access_type === 'internal') {
-      newConfig.access_type = 'public';
-      newConfig.require_login = false;
-      newConfig.allow_anonymous = true;
-    }
-
     setAccessConfig(newConfig);
     onChange({ ...newConfig, inviteEmails });
   };
 
-  const getAccessTypeDescription = (type) => {
-    switch (type) {
-      case 'public':
-        return 'Anyone can respond anonymously without login';
-      case 'public_with_login':
-        return 'Anyone can respond but must login first';
-      case 'private':
-        return 'Only invited people can respond';
-      case 'internal':
-        return 'Only workspace/organization members can respond';
-      default:
-        return '';
+  const accessOptions = [
+    {
+      type: 'public',
+      title: 'Public',
+      subtitle: 'Anyone can respond. No login required.',
+      icon: PublicIcon,
+      recommended: true
+    },
+    {
+      type: 'public_with_login',
+      title: 'Public (Login Required)',
+      subtitle: 'Anyone can respond, but must sign in.',
+      icon: LoginIcon
+    },
+    {
+      type: 'private',
+      title: 'Private (Invite Only)',
+      subtitle: 'Only invited people can access.',
+      icon: PrivateIcon
+    },
+    {
+      type: 'internal',
+      title: 'Internal (Workspace)',
+      subtitle: 'Only workspace members.',
+      icon: InternalIcon,
+      disabled: !availableWorkspaces.length
     }
-  };
-
-  const getAccessTypeIcon = (type) => {
-    switch (type) {
-      case 'public':
-        return '🌐';
-      case 'public_with_login':
-        return '🔒';
-      case 'private':
-        return '📧';
-      case 'internal':
-        return '🏢';
-      default:
-        return '';
-    }
-  };
+  ];
 
   return (
-    <div className={`${styles.surveyAccessControl} ${compact ? styles.compact : ''}`}>
-      {!compact && (
-        <div className={styles.header}>
-          <h3>Survey Access Control</h3>
-          <p>Choose who can access and respond to your survey</p>
-        </div>
-      )}
-
-      {/* Workspace Selection */}
-      <div className={styles.formGroup}>
-        <label>📁 Assign to Workspace (Optional)</label>
+    <div className={styles.container}>
+      {/* Workspace Selector (Top) */}
+      <div className={styles.workspaceSection}>
+        <label className={styles.sectionLabel}>Workspace Context (Optional)</label>
         <select
           value={accessConfig.workspace_id || ''}
           onChange={(e) => handleWorkspaceChange(e.target.value)}
-          className={styles.workspaceSelect}
+          className={styles.selectInput}
         >
-          <option value="">No Workspace (Personal Survey)</option>
-          {availableWorkspaces.map(workspace => (
-            <option key={workspace.id} value={workspace.id}>
-              {workspace.name}
-            </option>
+          <option value="">Personal Survey (No Workspace)</option>
+          {availableWorkspaces.map(w => (
+            <option key={w.id} value={w.id}>{w.name}</option>
           ))}
         </select>
-        <small className={styles.hint}>
-          Assigning to a workspace enables the "Internal" access option
-        </small>
       </div>
 
-      <div className={styles.accessTypes}>
-        {[
-          {
-            type: 'public',
-            title: 'Public',
-            subtitle: 'Open to everyone',
-            recommended: true
-          },
-          {
-            type: 'public_with_login',
-            title: 'Public with Login',
-            subtitle: 'Open but requires account'
-          },
-          {
-            type: 'private',
-            title: 'Private',
-            subtitle: 'Invitation only'
-          },
-          {
-            type: 'internal',
-            title: 'Internal',
-            subtitle: 'Workspace members only',
-            disabled: !accessConfig.workspace_id
-          }
-        ].map((option) => (
-          <div
-            key={option.type}
-            className={`${styles.accessTypeCard} ${accessConfig.access_type === option.type ? styles.selected : ''
-              } ${option.disabled ? styles.disabled : ''}`}
-            onClick={() => !option.disabled && handleAccessTypeChange(option.type)}
-          >
-            <div className={styles.cardHeader}>
-              <div className={styles.cardIcon}>
-                {getAccessTypeIcon(option.type)}
-              </div>
-              <div className={styles.cardTitle}>
-                <h4>
-                  {option.title}
-                  {option.recommended && <span className={styles.recommended}>Recommended</span>}
-                  {option.disabled && <span className={styles.disabled}>Unavailable</span>}
-                </h4>
-                <p>{option.subtitle}</p>
-              </div>
-            </div>
-            <div className={styles.cardDescription}>
-              {getAccessTypeDescription(option.type)}
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* Access Cards */}
+      <h3 className={styles.sectionTitle}>Who can respond?</h3>
+      <div className={styles.cardsGrid}>
+        {accessOptions.map((opt) => {
+          const Icon = opt.icon;
+          const isSelected = accessConfig.access_type === opt.type;
+          const isDisabled = opt.disabled;
 
-      {/* Private Survey Invite Section */}
-      {accessConfig.access_type === 'private' && (
-        <div className={styles.inviteSection}>
-          <h4>Invite People</h4>
-          <p>Enter email addresses (one per line) to invite to this survey:</p>
-          <textarea
-            className={styles.inviteTextarea}
-            value={inviteEmails}
-            onChange={(e) => handleInviteEmailsChange(e.target.value)}
-            placeholder="email1@example.com&#10;email2@example.com&#10;email3@example.com"
-            rows="4"
-          />
-          <small className={styles.hint}>
-            💡 Registered users will receive a notification. Invitations will be sent after saving the survey.
-          </small>
-
-          {/* List of sent invites */}
-          {surveyId && (
-            <div className={styles.sentInvitesList}>
-              <h5>Sent Invitations ({sentInvites.length})</h5>
-              {loadingInvites ? (
-                <div>Loading invites...</div>
-              ) : sentInvites.length > 0 ? (
-                <div className={styles.inviteTable}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>Sent Date</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sentInvites.map(invite => (
-                        <tr key={invite.id}>
-                          <td>{invite.email}</td>
-                          <td>
-                            <span className={`${styles.statusBadge} ${styles[invite.status]}`}>
-                              {invite.status}
-                            </span>
-                          </td>
-                          <td>{new Date(invite.created_at).toLocaleDateString()}</td>
-                          <td>
-                            <button
-                              type="button"
-                              className={styles.resendButton}
-                              onClick={() => handleResendInvite(invite.email)}
-                              title="Resend Invitation"
-                            >
-                              Resend
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          return (
+            <button
+              key={opt.type}
+              type="button"
+              className={`${styles.card} ${isSelected ? styles.selected : ''} ${isDisabled ? styles.disabled : ''}`}
+              onClick={() => !isDisabled && handleAccessTypeChange(opt.type)}
+              disabled={isDisabled}
+            >
+              <div className={styles.cardContent}>
+                <Icon className={styles.icon} size={28} />
+                <div className={styles.text}>
+                  <div className={styles.titleRow}>
+                    <span className={styles.title}>{opt.title}</span>
+                    {opt.recommended && <span className={styles.badge}>Recommended</span>}
+                  </div>
+                  <span className={styles.subtitle}>{opt.subtitle}</span>
                 </div>
-              ) : (
-                <p className={styles.noInvites}>No invitations sent yet.</p>
-              )}
-            </div>
+              </div>
+              {isSelected && <div className={styles.checkMark}><CheckIcon size={16} /></div>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Private Details Section */}
+      {accessConfig.access_type === 'private' && (
+        <div className={styles.detailBox}>
+          <label>Invite Participants by Email</label>
+          <p className={styles.hintText}>Enter email addresses separated by commas or new lines.</p>
+
+          <textarea
+            value={inviteEmails}
+            onChange={(e) => setInviteEmails(e.target.value)}
+            onBlur={handleEmailBlur}
+            placeholder="user1@example.com&#10;user2@example.com, user3@example.com"
+            rows={4}
+            className={styles.emailInput}
+          />
+
+          <div className={styles.validationStats}>
+            {parsedEmails.length > 0 && (
+              <div className={styles.validList}>
+                <span className={styles.validCount}>✓ {parsedEmails.length} valid recipients</span>
+              </div>
+            )}
+            {invalidEmails.length > 0 && (
+              <div className={styles.invalidList}>
+                <span className={styles.invalidCount}>⚠️ {invalidEmails.length} invalid emails:</span>
+                <p className={styles.invalidItems}>{invalidEmails.slice(0, 5).join(', ')}{invalidEmails.length > 5 ? '...' : ''}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Access Summary Chips */}
+      <div className={styles.summaryBar}>
+        <span className={styles.summaryLabel}>Summary:</span>
+        <div className={styles.chipGroup}>
+          <span className={styles.chip}>
+            {accessConfig.access_type.replace(/_/g, ' ').toUpperCase()}
+          </span>
+          <span className={`${styles.chip} ${accessConfig.require_login ? styles.chipInfo : ''}`}>
+            {accessConfig.require_login ? 'Login Required' : 'No Login'}
+          </span>
+          {accessConfig.allow_anonymous && (
+            <span className={`${styles.chip} ${styles.chipSuccess}`}>Anonymous Allowed</span>
           )}
-        </div>
-      )}
-
-      {/* Internal Survey Workspace Info */}
-      {accessConfig.access_type === 'internal' && accessConfig.workspace_id && (
-        <div className={styles.internalInfo}>
-          <div className={styles.infoBox}>
-            <h4>🏢 Workspace Access</h4>
-            <p>This survey will only be accessible to members of your selected workspace.</p>
-            <small>Workspace: {availableWorkspaces.find(w => w.id === accessConfig.workspace_id)?.name}</small>
-          </div>
-        </div>
-      )}
-
-      {/* Access Summary */}
-      <div className={styles.summary}>
-        <h4>Access Summary</h4>
-        <div className={styles.summaryGrid}>
-          <div className={styles.summaryItem}>
-            <span className={styles.label}>Access Type:</span>
-            <span className={styles.value}>
-              {getAccessTypeIcon(accessConfig.access_type)} {accessConfig.access_type.replace('_', ' ').toUpperCase()}
-            </span>
-          </div>
-          <div className={styles.summaryItem}>
-            <span className={styles.label}>Login Required:</span>
-            <span className={styles.value}>
-              {accessConfig.require_login ? '✅ Yes' : '❌ No'}
-            </span>
-          </div>
-          <div className={styles.summaryItem}>
-            <span className={styles.label}>Anonymous Allowed:</span>
-            <span className={styles.value}>
-              {accessConfig.allow_anonymous ? '✅ Yes' : '❌ No'}
-            </span>
-          </div>
         </div>
       </div>
     </div>

@@ -5,13 +5,13 @@ const ThemeContext = createContext();
 export const ThemeProvider = ({ children }) => {
     // Check localStorage for saved theme, default to 'light'
     const [theme, setTheme] = useState(() => {
-        const savedTheme = localStorage.getItem('theme');
+        const savedTheme = localStorage.getItem('allmtags_theme');
         return savedTheme || 'light';
     });
 
     useEffect(() => {
         // Save theme to localStorage
-        localStorage.setItem('theme', theme);
+        localStorage.setItem('allmtags_theme', theme);
 
         // Apply theme to document body or html
         document.documentElement.setAttribute('data-theme', theme);

@@ -33,7 +33,7 @@ function initializeSocket(server, options = {}) {
     io.use((socket, next) => {
       try {
         const token = socket.handshake.auth.token;
-        
+
         if (!token) {
           logger.debug('[Socket] Connection without token - guest mode');
           return next();
@@ -107,9 +107,9 @@ function notifyUser(io, userId, notification) {
 
   const userIds = Array.isArray(userId) ? userId : [userId];
   userIds.forEach(id => {
-    // Emit to user's room (user:[userId])
-    io.to(`user:${id}`).emit('notification:new', notification);
-    logger.debug(`[Socket] Notification sent to user:${id}`);
+    // Emit to user's room (user_[userId])
+    io.to(`user_${id}`).emit('notification:new', notification);
+    logger.debug(`[Socket] Notification sent to user_${id}`);
   });
 }
 
@@ -146,4 +146,30 @@ module.exports = {
   notifyUser,
   notifyWorkspace,
   broadcastNotification
+};
+
+// Store io instance globally
+let ioInstance = null;
+
+/**
+ * Store Socket.IO instance
+ */
+function setIO(io) {
+  ioInstance = io;
+}
+
+/**
+ * Get Socket.IO instance
+ */
+function getIO() {
+  return ioInstance;
+}
+
+module.exports = {
+  initializeSocket,
+  notifyUser,
+  notifyWorkspace,
+  broadcastNotification,
+  setIO,
+  getIO
 };

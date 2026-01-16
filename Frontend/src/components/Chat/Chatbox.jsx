@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+// Chatbox Component
 import { ChatService } from '../../api/services';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -12,7 +13,7 @@ const Chatbox = ({ isOpen, onClose }) => {
     const { user } = useAuth();
     const { showToast } = useToast();
     const messagesEndRef = useRef(null);
-    
+
     const [conversations, setConversations] = useState([]);
     const [currentConversation, setCurrentConversation] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -21,26 +22,38 @@ const Chatbox = ({ isOpen, onClose }) => {
     const [showConversations, setShowConversations] = useState(false);
     const [apiProvider, setApiProvider] = useState('auto');
 
-    useEffect(() => {
-        if (isOpen) {
-            loadConversations();
+    // Define these functions first so loadConversations can depend on them
+    const createNewConversation = useCallback(async (title = 'New Chat') => {
+        try {
+            const response = await ChatService.createConversation(title);
+            const newConversation = response.data;
+
+            setConversations(prev => [newConversation, ...prev]);
+            setCurrentConversation(newConversation);
+            setMessages([]);
+
+            return newConversation;
+        } catch (error) {
+            showToast('Failed to create conversation', 'error');
+            throw error;
         }
-    }, [isOpen]);
+    }, [showToast]);
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+    const loadMessages = useCallback(async (conversationId) => {
+        try {
+            const response = await ChatService.getMessages(conversationId);
+            setMessages(response.data);
+        } catch (error) {
+            showToast('Failed to load messages', 'error');
+        }
+    }, [showToast]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    const loadConversations = async () => {
+    const loadConversations = useCallback(async () => {
         try {
             setIsLoading(true);
             const response = await ChatService.getConversations();
             setConversations(response.data);
-            
+
             // Auto-select the first conversation or create a new one
             if (response.data.length > 0) {
                 setCurrentConversation(response.data[0]);
@@ -53,32 +66,13 @@ const Chatbox = ({ isOpen, onClose }) => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [showToast, createNewConversation, loadMessages]);
 
-    const createNewConversation = async (title = 'New Chat') => {
-        try {
-            const response = await ChatService.createConversation(title);
-            const newConversation = response.data;
-            
-            setConversations(prev => [newConversation, ...prev]);
-            setCurrentConversation(newConversation);
-            setMessages([]);
-            
-            return newConversation;
-        } catch (error) {
-            showToast('Failed to create conversation', 'error');
-            throw error;
+    useEffect(() => {
+        if (isOpen) {
+            loadConversations();
         }
-    };
-
-    const loadMessages = async (conversationId) => {
-        try {
-            const response = await ChatService.getMessages(conversationId);
-            setMessages(response.data);
-        } catch (error) {
-            showToast('Failed to load messages', 'error');
-        }
-    };
+    }, [isOpen, loadConversations]);
 
     const selectConversation = async (conversation) => {
         setCurrentConversation(conversation);
@@ -91,9 +85,9 @@ const Chatbox = ({ isOpen, onClose }) => {
 
         try {
             setIsSending(true);
-            
+
             let conversation = currentConversation;
-            
+
             // Create new conversation if none exists
             if (!conversation) {
                 conversation = await createNewConversation();
@@ -108,12 +102,12 @@ const Chatbox = ({ isOpen, onClose }) => {
                 created_at: new Date().toISOString(),
                 status: 'sending'
             };
-            
+
             setMessages(prev => [...prev, userMessage]);
 
             // Send message to backend
             const response = await ChatService.sendMessage(conversation.id, messageText, apiProvider);
-            
+
             // Update messages with the actual saved messages
             if (response.data.userMessage && response.data.aiResponse) {
                 setMessages(prev => {
@@ -128,9 +122,9 @@ const Chatbox = ({ isOpen, onClose }) => {
                 const newTitle = messageText.slice(0, 30) + (messageText.length > 30 ? '...' : '');
                 try {
                     await ChatService.updateConversation(conversation.id, { title: newTitle });
-                    setConversations(prev => 
-                        prev.map(conv => 
-                            conv.id === conversation.id 
+                    setConversations(prev =>
+                        prev.map(conv =>
+                            conv.id === conversation.id
                                 ? { ...conv, title: newTitle }
                                 : conv
                         )
@@ -144,7 +138,7 @@ const Chatbox = ({ isOpen, onClose }) => {
 
         } catch (error) {
             showToast('Failed to send message', 'error');
-            
+
             // Remove the temporary message if sending failed
             setMessages(prev => prev.filter(msg => msg.id !== 'temp-' + Date.now()));
         } finally {
@@ -156,7 +150,7 @@ const Chatbox = ({ isOpen, onClose }) => {
         try {
             await ChatService.deleteConversation(conversationId);
             setConversations(prev => prev.filter(conv => conv.id !== conversationId));
-            
+
             if (currentConversation?.id === conversationId) {
                 const remainingConversations = conversations.filter(conv => conv.id !== conversationId);
                 if (remainingConversations.length > 0) {
@@ -167,7 +161,7 @@ const Chatbox = ({ isOpen, onClose }) => {
                     setMessages([]);
                 }
             }
-            
+
             showToast('Conversation deleted successfully', 'success');
         } catch (error) {
             showToast('Failed to delete conversation', 'error');
@@ -182,20 +176,20 @@ const Chatbox = ({ isOpen, onClose }) => {
                 {/* Header */}
                 <div className={styles.header}>
                     <div className={styles.headerLeft}>
-                        <button 
+                        <button
                             className={styles.conversationsBtn}
                             onClick={() => setShowConversations(!showConversations)}
                             title="Toggle conversations"
                         >
-                            Γÿ░
+                            💬
                         </button>
                         <h3>
                             {currentConversation?.title || 'Chat with AI'}
                         </h3>
                     </div>
                     <div className={styles.headerRight}>
-                        <select 
-                            value={apiProvider} 
+                        <select
+                            value={apiProvider}
                             onChange={(e) => setApiProvider(e.target.value)}
                             className={styles.providerSelect}
                             title="Select AI provider"
@@ -204,19 +198,19 @@ const Chatbox = ({ isOpen, onClose }) => {
                             <option value="super_dev">Super Dev</option>
                             <option value="gemini">Gemini</option>
                         </select>
-                        <button 
+                        <button
                             className={styles.newChatBtn}
                             onClick={() => createNewConversation()}
                             title="New conversation"
                         >
                             +
                         </button>
-                        <button 
+                        <button
                             className={styles.closeBtn}
                             onClick={onClose}
                             title="Close chat"
                         >
-                            ├ù
+                            ✕
                         </button>
                     </div>
                 </div>
@@ -245,7 +239,7 @@ const Chatbox = ({ isOpen, onClose }) => {
                                 <div className={styles.messages}>
                                     {messages.length === 0 ? (
                                         <div className={styles.emptyState}>
-                                            <div className={styles.emptyIcon}>≡ƒÆ¼</div>
+                                            <div className={styles.emptyIcon}>🗨️</div>
                                             <h4>Start a conversation</h4>
                                             <p>Ask me anything! I can help with coding, general questions, and more.</p>
                                             <div className={styles.suggestions}>

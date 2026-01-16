@@ -50,8 +50,8 @@ module.exports = (sequelize, DataTypes) => {
       indexes: [
         {
           unique: true,
-          fields: ['workspace_id', 'invitee_email', 'status'],
-          name: 'unique_pending_invitation'
+          fields: ['workspace_id', 'invitee_email'],
+          name: 'unique_workspace_invitee'
         },
         {
           fields: ['token']

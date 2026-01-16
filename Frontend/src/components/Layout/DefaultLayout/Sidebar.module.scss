@@ -134,6 +134,29 @@
       border-radius: 0 3px 3px 0;
     }
   }
+
+  &.navItemLocked {
+    opacity: 0.6;
+    cursor: pointer;
+    
+    .navLabel {
+      color: #9ca3af;
+    }
+
+    &:hover {
+      background: #f9fafb;
+      .navIcon {
+        color: #6b7280;
+      }
+    }
+  }
+}
+
+.lockIcon {
+  margin-left: auto;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
 }
 
 .navIcon {

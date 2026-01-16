@@ -4,7 +4,8 @@ const { Op } = require('sequelize');
 const logger = require('../../../utils/logger');
 const crypto = require('crypto');
 const emailService = require('../../../utils/email.service');
-const notificationService = require('../../../utils/notification.service');
+const notificationService = require('../../notifications/service/notification.service');
+const activityService = require('./activity.service');
 
 class WorkspaceService {
   /**
@@ -31,7 +32,7 @@ class WorkspaceService {
     ];
 
     let whereCondition = {};
-    
+
     // Admin can see all workspaces
     if (user && user.role === 'admin') {
       // No where condition - admin sees all workspaces
@@ -43,14 +44,18 @@ class WorkspaceService {
         where: { user_id: userId },
         attributes: ['workspace_id']
       }).then(results => results.map(r => r.workspace_id));
-      
+
+      // Build condition - handle empty memberWorkspaceIds
+      const conditions = [{ owner_id: userId }];
+
+      if (memberWorkspaceIds.length > 0) {
+        conditions.push({ id: { [Op.in]: memberWorkspaceIds } });
+      }
+
       whereCondition = {
-        [Op.or]: [
-          { owner_id: userId },
-          { id: { [Op.in]: memberWorkspaceIds } }
-        ]
+        [Op.or]: conditions
       };
-      
+
       includeConfig[1].required = false;
     }
 
@@ -63,7 +68,7 @@ class WorkspaceService {
     return workspaces.map(ws => {
       const wsData = ws.toJSON();
       let userRole = 'member';
-      
+
       // Determine user role
       if (user && user.role === 'admin') {
         userRole = 'admin';
@@ -73,7 +78,7 @@ class WorkspaceService {
         const userMembership = wsData.members && wsData.members.find(m => m.user_id === userId);
         userRole = userMembership?.role || 'member';
       }
-      
+
       return {
         id: wsData.id,
         name: wsData.name,
@@ -81,6 +86,7 @@ class WorkspaceService {
         owner_id: wsData.owner_id,
         owner: wsData.owner,
         role: userRole,
+        current_user_role: userRole, // Added per requirement
         surveyCount: (wsData.surveys || []).length,
         createdAt: wsData.created_at,
         members: wsData.members || []
@@ -92,14 +98,14 @@ class WorkspaceService {
    * Get workspaces with pagination
    */
   async getMyWorkspacesPaginated(userId, user = null, options = {}) {
-    const { page = 1, limit = 10, search = '' } = options;
+    const { page = 1, limit = 10, search = '', scope = 'my' } = options;
     const offset = (page - 1) * limit;
 
     const includeConfig = [
       {
         model: User,
         as: 'owner',
-        attributes: ['id', 'username', 'email']
+        attributes: ['id', 'username', 'email', 'full_name']
       },
       {
         model: WorkspaceMember,
@@ -115,29 +121,48 @@ class WorkspaceService {
     ];
 
     let whereCondition = {};
-    
-    // Admin can see all workspaces
-    if (user && user.role === 'admin') {
-      // No where condition - admin sees all workspaces
-      // But still need to include all members
-      includeConfig[1].required = false;
+
+    // Determine filter based on scope and role
+    // Default to 'my' workspaces behavior
+    let showAll = false;
+
+    // Only Admin can see ALL, and only if they explicitly requested it
+    if (user && user.role === 'admin' && scope === 'all') {
+      showAll = true;
+    }
+
+    if (showAll) {
+      // Admin seeing ALL workspaces: No filter on owner/members
+      // check if includeConfig[1] exists and is correct model
+      if (includeConfig[1] && includeConfig[1].as === 'members') {
+        includeConfig[1].required = false;
+      }
     } else {
-      // Regular users see only their workspaces
-      // Use subquery approach to avoid column reference issues
+      // "My Workspaces" logic
+      // Applies to:
+      // 1. Regular users (always)
+      // 2. Admins who selected "My Workspaces" (scope='my')
+
       const memberWorkspaceIds = await WorkspaceMember.findAll({
         where: { user_id: userId },
         attributes: ['workspace_id']
       }).then(results => results.map(r => r.workspace_id));
-      
+
+      // Build condition - handle empty memberWorkspaceIds to avoid SQL errors
+      const conditions = [{ owner_id: userId }];
+
+      if (memberWorkspaceIds.length > 0) {
+        conditions.push({ id: { [Op.in]: memberWorkspaceIds } });
+      }
+
       whereCondition = {
-        [Op.or]: [
-          { owner_id: userId },
-          { id: { [Op.in]: memberWorkspaceIds } }
-        ]
+        [Op.or]: conditions
       };
-      
-      // Remove user filter from include since we're filtering at workspace level
-      includeConfig[1].required = false;
+
+      // Ensure member join is not required when filtering by ID/Owner
+      if (includeConfig[1] && includeConfig[1].as === 'members') {
+        includeConfig[1].required = false;
+      }
     }
 
     // Add search condition
@@ -169,7 +194,7 @@ class WorkspaceService {
     const workspaces = rows.map(ws => {
       const wsData = ws.toJSON();
       let userRole = 'member';
-      
+
       // Determine user role
       if (user && user.role === 'admin') {
         userRole = 'admin';
@@ -179,7 +204,7 @@ class WorkspaceService {
         const userMembership = wsData.members && wsData.members.find(m => m.user_id === userId);
         userRole = userMembership?.role || 'member';
       }
-      
+
       return {
         id: wsData.id,
         name: wsData.name,
@@ -187,6 +212,7 @@ class WorkspaceService {
         owner_id: wsData.owner_id,
         owner: wsData.owner,
         role: userRole,
+        current_user_role: userRole, // Added per requirement
         surveyCount: (wsData.surveys || []).length,
         createdAt: wsData.created_at,
         members: wsData.members || []
@@ -207,19 +233,16 @@ class WorkspaceService {
   /**
    * Log workspace activity
    */
-  async logActivity(workspaceId, userId, action, targetType = null, targetId = null, metadata = null) {
-    try {
-      await WorkspaceActivity.create({
-        workspace_id: workspaceId,
-        user_id: userId,
-        action,
-        target_type: targetType,
-        target_id: targetId,
-        metadata
-      });
-    } catch (error) {
-      logger.error('Error logging workspace activity:', error);
-    }
+  async logActivity(workspaceId, userId, action, targetType = null, targetId = null, metadata = null, io = null) {
+    return activityService.logActivity({
+      workspaceId,
+      userId,
+      action,
+      targetType,
+      targetId,
+      metadata,
+      io
+    });
   }
 
   /**
@@ -276,7 +299,7 @@ class WorkspaceService {
         {
           model: Survey,
           as: 'surveys',
-          attributes: ['id', 'title', 'status', 'visibility', 'created_by']
+          attributes: ['id', 'title', 'status', 'access_type', 'created_by']
         }
       ]
     });
@@ -294,7 +317,7 @@ class WorkspaceService {
     }
 
     const wsData = workspace.toJSON();
-    
+
     // Determine current user's role
     let userRole = 'member';
     if (isOwner) {
@@ -303,14 +326,16 @@ class WorkspaceService {
       const userMembership = wsData.members.find(m => m.user_id === userId);
       userRole = userMembership?.role || 'member';
     }
-    
+
     return {
       id: wsData.id,
       name: wsData.name,
       description: wsData.description,
       owner_id: wsData.owner_id,
       owner: wsData.owner,
-      role: userRole, // Add current user's role
+      owner: wsData.owner,
+      role: userRole,
+      current_user_role: userRole, // Added per requirement
       visibility: wsData.visibility,
       members: wsData.members.map(m => ({
         id: m.id,
@@ -393,27 +418,17 @@ class WorkspaceService {
   /**
    * Remove member from workspace (owner only)
    */
-  async removeMember(workspaceId, memberId, currentUserId) {
+  async removeMember(workspaceId, memberId, currentUserId, io = null) {
     const workspace = await Workspace.findByPk(workspaceId);
     if (!workspace) {
       throw new Error('Workspace not found');
     }
 
-    console.log('[removeMember] Raw values:', {
-      workspaceOwnerId: workspace.owner_id,
-      workspaceOwnerIdType: typeof workspace.owner_id,
-      currentUserId,
-      currentUserIdType: typeof currentUserId
-    });
-
     const ownerId = parseInt(workspace.owner_id);
     const userId = parseInt(currentUserId);
 
-    logger.debug(`[removeMember] Checking permission: userId=${userId} (type: ${typeof userId}), ownerId=${ownerId} (type: ${typeof ownerId})`);
-
     // Check if current user is owner
     if (ownerId !== userId) {
-      logger.error(`[removeMember] Permission denied: user ${userId} is not owner (owner is ${ownerId})`);
       throw new Error('Only the workspace owner can remove members');
     }
 
@@ -425,16 +440,199 @@ class WorkspaceService {
     });
 
     if (!member) {
-      logger.warn(`Workspace member not found for removal: workspace_id=${workspaceId}, user_id=${memberId}`);
       return { message: 'Member not found, nothing to remove' };
     }
 
+    // Before destroying, perform cleanup
+    await this._cleanupMemberExit(workspace, memberId, io);
+
     await member.destroy();
+
+    // Log activity
+    await this.logActivity(workspaceId, userId, 'member_removed', 'user', memberId, {
+      action: 'removed'
+    }, io);
 
     logger.info(`Workspace member removed: workspace_id=${workspaceId}, user_id=${memberId}`);
 
     return { message: 'Member removed successfully' };
   }
+
+  /**
+   * Update member role (owner only)
+   */
+  async updateMemberRole(workspaceId, memberId, newRole, currentUserId, io = null) {
+    const workspace = await Workspace.findByPk(workspaceId);
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+
+    const ownerId = parseInt(workspace.owner_id);
+    const userId = parseInt(currentUserId);
+
+    // Check if current user is owner
+    if (ownerId !== userId) {
+      throw new Error('Only the workspace owner can change member roles');
+    }
+
+    // Validate role
+    const validRoles = ['owner', 'collaborator', 'member', 'viewer'];
+    if (!validRoles.includes(newRole)) {
+      throw new Error(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
+    }
+
+    // Find the member
+    const member = await WorkspaceMember.findOne({
+      where: {
+        workspace_id: workspaceId,
+        user_id: memberId
+      }
+    });
+
+    if (!member) {
+      throw new Error('Member not found in workspace');
+    }
+
+    // Prevent changing the owner's role
+    if (parseInt(memberId) === ownerId) {
+      throw new Error('Cannot change the owner\'s role. Transfer ownership first.');
+    }
+
+    const oldRole = member.role;
+    await member.update({ role: newRole });
+
+    // Log activity
+    await this.logActivity(workspaceId, currentUserId, 'member_role_updated', 'user', memberId, {
+      old_role: oldRole,
+      new_role: newRole
+    }, io); // Pass io
+
+    logger.info(`Member role updated: workspace_id=${workspaceId}, user_id=${memberId}, old_role=${oldRole}, new_role=${newRole}`);
+
+    return {
+      id: member.id,
+      user_id: member.user_id,
+      role: member.role,
+      message: 'Member role updated successfully'
+    };
+  }
+
+  /**
+   * Leave workspace (members only, not owner)
+   */
+  async leaveWorkspace(workspaceId, userId, io = null) {
+    const workspace = await Workspace.findByPk(workspaceId);
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+
+    const ownerId = parseInt(workspace.owner_id);
+    const currentUserId = parseInt(userId);
+
+    // Prevent owner from leaving
+    if (ownerId === currentUserId) {
+      throw new Error('Workspace owner cannot leave. Transfer ownership first.');
+    }
+
+    // Find the member
+    const member = await WorkspaceMember.findOne({
+      where: {
+        workspace_id: workspaceId,
+        user_id: userId
+      }
+    });
+
+    if (!member) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    // Before destroying, perform cleanup
+    await this._cleanupMemberExit(workspace, userId, io);
+
+    await member.destroy();
+
+    // Log activity
+    await this.logActivity(workspaceId, userId, 'left', 'user', userId, null, io);
+
+    logger.info(`User left workspace: workspace_id=${workspaceId}, user_id=${userId}`);
+
+    return { message: 'Successfully left workspace' };
+  }
+
+  /**
+   * Transfer ownership to another member (owner only)
+   */
+  async transferOwnership(workspaceId, newOwnerId, currentUserId) {
+    const workspace = await Workspace.findByPk(workspaceId);
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+
+    const ownerId = parseInt(workspace.owner_id);
+    const userId = parseInt(currentUserId);
+    const newOwner = parseInt(newOwnerId);
+
+    // Check if current user is owner
+    if (ownerId !== userId) {
+      throw new Error('Only the workspace owner can transfer ownership');
+    }
+
+    // Prevent transferring to self
+    if (ownerId === newOwner) {
+      throw new Error('You are already the owner');
+    }
+
+    // Check if new owner is a member
+    const newOwnerMember = await WorkspaceMember.findOne({
+      where: {
+        workspace_id: workspaceId,
+        user_id: newOwnerId
+      }
+    });
+
+    if (!newOwnerMember) {
+      throw new Error('New owner must be a member of the workspace');
+    }
+
+    // Check if new owner user exists
+    const newOwnerUser = await User.findByPk(newOwnerId);
+    if (!newOwnerUser) {
+      throw new Error('New owner user not found');
+    }
+
+    // Update workspace owner
+    await workspace.update({ owner_id: newOwnerId });
+
+    // Update old owner's role to collaborator
+    const oldOwnerMember = await WorkspaceMember.findOne({
+      where: {
+        workspace_id: workspaceId,
+        user_id: currentUserId
+      }
+    });
+
+    if (oldOwnerMember) {
+      await oldOwnerMember.update({ role: 'collaborator' });
+    }
+
+    // Update new owner's role to owner
+    await newOwnerMember.update({ role: 'owner' });
+
+    // Log activity
+    await this.logActivity(workspaceId, currentUserId, 'ownership_transferred', 'user', newOwnerId, {
+      old_role: currentUserId,
+      new_role: newOwnerId
+    });
+
+    logger.info(`Ownership transferred: workspace_id=${workspaceId}, old_owner=${currentUserId}, new_owner=${newOwnerId}`);
+
+    return {
+      message: 'Ownership transferred successfully',
+      new_owner_id: newOwnerId,
+      workspace_id: workspaceId
+    };
+  }
+
 
   /**
    * Check if user is a member of workspace
@@ -624,20 +822,54 @@ class WorkspaceService {
       throw error;
     }
 
-    // Create membership with status 'active' (no pending logic for now)
-    const member = await WorkspaceMember.create({
-      workspace_id: workspaceId,
-      user_id: newUserId,
-      role
+    // Create or Recycle invitation
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    const [invitation, created] = await WorkspaceInvitation.findOrCreate({
+      where: {
+        workspace_id: workspaceId,
+        invitee_email: newUser.email
+      },
+      defaults: {
+        inviter_id: currentUserId,
+        invitee_id: newUserId,
+        role,
+        token,
+        status: 'pending',
+        expires_at: expiresAt
+      }
     });
 
-    logger.info(`Member invited to workspace: workspace_id=${workspaceId}, user_id=${newUserId}, role=${role}, invited_by=${currentUserId}`);
+    if (!created) {
+      // Recycle existing invitation
+      await invitation.update({
+        inviter_id: currentUserId,
+        invitee_id: newUserId,
+        role,
+        token,
+        status: 'pending',
+        expires_at: expiresAt
+      });
+    }
+
+    try {
+      await notificationService.notifyWorkspaceInvitation(
+        newUserId,
+        workspaceId,
+        currentUserId,
+        `You have been invited to join workspace "${workspace.name}" as ${role}`,
+        token
+      );
+    } catch (notifError) {
+      logger.warn(`Failed to send invite notification: ${notifError.message}`);
+    }
+
+    logger.info(`Workspace invitation sent/recycled: workspace_id=${workspaceId}, to_user=${newUserId}, role=${role}`);
 
     return {
-      id: member.id,
-      user_id: member.user_id,
-      role: member.role,
-      status: 'active'
+      message: created ? 'Invitation sent successfully' : 'Invitation updated and resent',
+      invitation
     };
   }
 
@@ -745,42 +977,46 @@ class WorkspaceService {
       throw new Error('User is already a member of this workspace');
     }
 
-    // Check for existing pending invitation
-    const existingInvitation = await WorkspaceInvitation.findOne({
-      where: {
-        workspace_id: workspaceId,
-        invitee_email: inviteeEmail,
-        status: 'pending'
-      }
-    });
-
-    if (existingInvitation) {
-      throw new Error('Invitation already sent to this email');
-    }
-
     // Find invitee user if exists
     const inviteeUser = await User.findOne({ where: { email: inviteeEmail } });
 
-    // Create invitation
+    // Create or Recycle invitation
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
-    const invitation = await WorkspaceInvitation.create({
-      workspace_id: workspaceId,
-      inviter_id: inviterUserId,
-      invitee_email: inviteeEmail,
-      invitee_id: inviteeUser?.id || null,
-      role,
-      token,
-      expires_at: expiresAt
+    const [invitation, created] = await WorkspaceInvitation.findOrCreate({
+      where: {
+        workspace_id: workspaceId,
+        invitee_email: inviteeEmail
+      },
+      defaults: {
+        inviter_id: inviterUserId,
+        invitee_id: inviteeUser?.id || null,
+        role,
+        token,
+        status: 'pending',
+        expires_at: expiresAt
+      }
     });
+
+    if (!created) {
+      // Recycle existing invitation
+      await invitation.update({
+        inviter_id: inviterUserId,
+        invitee_id: inviteeUser?.id || null,
+        role,
+        token,
+        status: 'pending',
+        expires_at: expiresAt
+      });
+    }
 
     // Send invitation email
     try {
       const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
       const inviter = await User.findByPk(inviterUserId);
-      
+
       await emailService.sendWorkspaceInvitation(
         inviteeEmail,
         inviter?.full_name || inviter?.username || 'A user',
@@ -788,13 +1024,12 @@ class WorkspaceService {
         token,
         frontendUrl
       );
-      
+
       logger.info(`[WorkspaceService] Sent invitation email to ${inviteeEmail} for workspace ${workspaceId}`);
     } catch (emailError) {
       logger.warn(`[WorkspaceService] Failed to send invitation email: ${emailError.message}`);
       // Don't throw - email is non-critical
     }
-
     // Create notification for invitee if user exists in system
     if (inviteeUser) {
       try {
@@ -802,9 +1037,8 @@ class WorkspaceService {
           inviteeUser.id,
           workspaceId,
           inviterUserId,
-          `You've been invited to join "${workspace.name}"`,
-          token,
-          io // Pass io for real-time notifications
+          `You have been invited to join "${workspace.name}" as a ${role}. You can start participating in surveys with the team here.`,
+          token
         );
       } catch (notifError) {
         logger.warn(`[WorkspaceService] Failed to create notification: ${notifError.message}`);
@@ -815,7 +1049,22 @@ class WorkspaceService {
     await this.logActivity(workspaceId, inviterUserId, 'member_invited', 'user', inviteeUser?.id, {
       invitee_email: inviteeEmail,
       role
-    });
+    }, io);
+
+    // Check for role mismatch warning (User invited as Collaborator/Owner but system role is 'user')
+    if (inviteeUser && inviteeUser.role === 'user' && ['collaborator', 'owner'].includes(role)) {
+      const warningMessage = `Cảnh báo: Người dùng ${inviteeUser.full_name || inviteeUser.username} hiện có vai trò hệ thống là User. Họ sẽ không thể thực hiện các quyền ${role === 'collaborator' ? 'Collaborator' : 'Owner'} (tạo Template/Survey) cho đến khi nâng cấp tài khoản lên Creator.`;
+      
+      await this.logActivity(workspaceId, inviterUserId, 'role_mismatch_warning', 'user', inviteeUser.id, {
+        invitee_email: inviteeEmail,
+        workspace_role: role,
+        system_role: inviteeUser.role,
+        warning: warningMessage,
+        blocked_features: ['create_template', 'create_survey', 'create_workspace']
+      }, io);
+
+      logger.warn(`[WorkspaceService] Role mismatch: User ${inviteeUser.id} invited as ${role} but system role is ${inviteeUser.role}`);
+    }
 
     return invitation;
   }
@@ -823,7 +1072,7 @@ class WorkspaceService {
   /**
    * Accept workspace invitation
    */
-  async acceptInvitation(token, userId) {
+  async acceptInvitation(token, userId, io = null) {
     const invitation = await WorkspaceInvitation.findOne({
       where: { token, status: 'pending' },
       include: [
@@ -853,7 +1102,7 @@ class WorkspaceService {
 
     if (existingMember) {
       // User is already a member - just update invitation status and return workspace
-      await invitation.update({ 
+      await invitation.update({
         status: 'accepted',
         invitee_id: userId
       });
@@ -861,6 +1110,7 @@ class WorkspaceService {
     }
 
     // Add user as member - use findOrCreate to handle race conditions
+    // This ensures atomic operation: member creation happens before invitation update
     const [member, created] = await WorkspaceMember.findOrCreate({
       where: {
         workspace_id: invitation.workspace_id,
@@ -872,18 +1122,34 @@ class WorkspaceService {
       }
     });
 
-    // Update invitation status
-    await invitation.update({ 
+    // Update invitation status - AFTER member is created (atomic sequence)
+    await invitation.update({
       status: 'accepted',
       invitee_id: userId
     });
+
+    // Emit real-time role_updated event for AuthContext refresh
+    if (io && created) {
+      try {
+        io.to(`user_${userId}`).emit('role_updated', {
+          userId: userId,
+          workspaceId: invitation.workspace_id,
+          newRole: invitation.role,
+          action: 'workspace_joined'
+        });
+        logger.info(`📡 Emitted role_updated event for user ${userId} joining workspace ${invitation.workspace_id}`);
+      } catch (socketError) {
+        logger.warn(`⚠️ Failed to emit role_updated event: ${socketError.message}`);
+        // Don't throw - real-time update is non-critical
+      }
+    }
 
     // Log activity only if member was newly created
     if (created) {
       await this.logActivity(invitation.workspace_id, userId, 'joined', 'workspace', invitation.workspace_id, {
         via_invitation: true,
         role: invitation.role
-      });
+      }, io);
     }
 
     return invitation.workspace;
@@ -917,21 +1183,7 @@ class WorkspaceService {
   async getWorkspaceActivities(workspaceId, userId, limit = 20) {
     // Check access
     await this.getWorkspaceById(workspaceId, userId);
-
-    const activities = await WorkspaceActivity.findAll({
-      where: { workspace_id: workspaceId },
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'username', 'full_name']
-        }
-      ],
-      order: [['created_at', 'DESC']],
-      limit
-    });
-
-    return activities;
+    return activityService.getActivities(workspaceId, limit);
   }
 
   /**
@@ -1004,11 +1256,11 @@ class WorkspaceService {
 
     // Log activity (non-blocking)
     try {
-      const metadataObj = { 
+      const metadataObj = {
         previous: previousValues,
         updated: updatedValues
       };
-      
+
       await WorkspaceActivity.create({
         workspace_id: workspaceId,
         user_id: userId,
@@ -1017,7 +1269,7 @@ class WorkspaceService {
         target_id: workspaceId,
         metadata: metadataObj
       });
-      
+
       console.log('Activity logged with metadata:', JSON.stringify(metadataObj, null, 2));
     } catch (activityError) {
       // Log error but don't fail the main operation
@@ -1053,8 +1305,8 @@ class WorkspaceService {
         action: 'workspace_deleted',
         target_type: 'workspace',
         target_id: workspaceId,
-        metadata: { 
-          workspace_name: workspace.name 
+        metadata: {
+          workspace_name: workspace.name
         }
       });
     } catch (activityError) {
@@ -1079,7 +1331,7 @@ class WorkspaceService {
     }
 
     const invitations = await WorkspaceInvitation.findAll({
-      where: { 
+      where: {
         workspace_id: workspaceId,
         status: ['pending', 'expired'] // Include expired for reference
       },
@@ -1112,7 +1364,7 @@ class WorkspaceService {
    */
   async getReceivedInvitations(userEmail) {
     const invitations = await WorkspaceInvitation.findAll({
-      where: { 
+      where: {
         invitee_email: userEmail,
         status: 'pending'
       },
@@ -1216,7 +1468,7 @@ class WorkspaceService {
     // Send invitation email
     try {
       const acceptUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/workspace/invitation/${newToken}/accept`;
-      
+
       await emailService.sendWorkspaceInvitation(
         invitation.invitee_email,
         invitation.inviter.username,
@@ -1302,6 +1554,190 @@ class WorkspaceService {
       email: invitation.invitee_email,
       token: invitation.token
     };
+  }
+
+  /**
+   * Request a role change in a workspace
+   */
+  async requestRoleChange(workspaceId, userId, requestedRole, io = null) {
+    const workspace = await Workspace.findByPk(workspaceId, {
+      include: [{ model: User, as: 'owner', attributes: ['id', 'username'] }]
+    });
+
+    if (!workspace) {
+      throw new Error('Workspace not found');
+    }
+
+    const requester = await User.findByPk(userId, { attributes: ['id', 'username', 'full_name'] });
+    const requesterName = requester.full_name || requester.username;
+
+    // Check if user is a member
+    const membership = await WorkspaceMember.findOne({
+      where: { workspace_id: workspaceId, user_id: userId }
+    });
+
+    if (!membership) {
+      throw new Error('You are not a member of this workspace');
+    }
+
+    if (membership.role === 'owner') {
+      throw new Error('You are already the owner of this workspace');
+    }
+
+    if (membership.role === requestedRole) {
+      throw new Error(`You already have the role of ${requestedRole}`);
+    }
+
+    // Send notification to owner
+    await notificationService.notifyRoleChangeRequest(
+      workspace.owner_id,
+      workspaceId,
+      workspace.name,
+      userId,
+      requesterName,
+      requestedRole,
+      io
+    );
+
+    // Log activity
+    await this.logActivity(workspaceId, userId, 'member_role_requested', 'user', userId, {
+      requested_role: requestedRole
+    }, io);
+
+    return {
+      ok: true,
+      message: 'Promotion request sent to workspace owner'
+    };
+  }
+
+  /**
+   * Handle role change request (Approve/Decline)
+   */
+  async handleRoleChangeRequest(notificationId, action, ownerId, io = null) {
+    const { Notification } = require('../../../models');
+    const notification = await Notification.findByPk(notificationId);
+
+    if (!notification || notification.user_id !== ownerId) {
+      throw new Error('Notification not found or unauthorized');
+    }
+
+    if (notification.type !== 'role_change_request') {
+      throw new Error('Invalid notification type');
+    }
+
+    const { requesting_user_id, requested_role, workspace_id } = notification.metadata;
+
+    if (action === 'approve') {
+      // Find the member
+      const member = await WorkspaceMember.findOne({
+        where: { workspace_id, user_id: requesting_user_id }
+      });
+
+      if (!member) {
+        throw new Error('Requesting user is no longer a member of this workspace');
+      }
+
+      const oldRole = member.role;
+      await member.update({ role: requested_role });
+
+      // Log activity
+      await this.logActivity(workspace_id, ownerId, 'member_role_updated', 'user', requesting_user_id, {
+        old_role: oldRole,
+        new_role: requested_role,
+        via_request: true
+      }, io); // Pass io
+
+      // Notify user
+      await notificationService.createNotification({
+        user_id: requesting_user_id,
+        type: 'workspace_member_added', // Use closest existing type or generic
+        title: 'Promotion Approved',
+        message: `Your request to be ${requested_role} in "${notification.message.match(/"([^"]+)"/)[1]}" has been approved.`,
+        related_id: workspace_id,
+        related_type: 'workspace',
+        action_url: `/workspaces/${workspace_id}`
+      }, io);
+
+    } else {
+      // Decline logic
+      // Notify user
+      await notificationService.createNotification({
+        user_id: requesting_user_id,
+        type: 'workspace_member_added',
+        title: 'Promotion Declined',
+        message: `Your request to be promoted in "${notification.message.match(/"([^"]+)"/)[1]}" has been declined.`,
+        related_id: workspace_id,
+        related_type: 'workspace'
+      }, io);
+    }
+
+    // Mark request notification as read and archive/delete
+    notification.is_read = true;
+    notification.is_archived = true;
+    await notification.save();
+
+    return {
+      ok: true,
+      message: action === 'approve' ? 'Promotion approved successfully' : 'Promotion request declined'
+    };
+  }
+
+  /**
+   * Private helper to handle cleanup when a member leaves/is removed
+   * @private
+   */
+  async _cleanupMemberExit(workspace, userId, io = null) {
+    const workspaceId = workspace.id;
+    const ownerId = workspace.owner_id;
+
+    // 1. Asset Retention: Transfer survey ownership to Workspace Owner
+    // Update all surveys in this workspace originally created by the exiting user
+    await Survey.update(
+      { created_by: ownerId },
+      {
+        where: {
+          workspace_id: workspaceId,
+          created_by: userId
+        }
+      }
+    );
+
+    // 2. Role Restoration: Check if user should still be a 'creator'
+    // Logic: If they are no longer an owner of ANY workspace, downgrade to 'user'
+    const ownedWorkspacesCount = await Workspace.count({ where: { owner_id: userId } });
+    if (ownedWorkspacesCount === 0) {
+      const user = await User.findByPk(userId);
+      if (user && user.role === 'creator') {
+        // Update role in database
+        await user.update({ role: 'user' });
+        logger.info(`✅ User ${userId} downgraded to 'user' role (no workspaces owned)`);
+
+        // Emit role_updated event for immediate frontend context refresh
+        if (io) {
+          try {
+            io.to(`user_${userId}`).emit('role_updated', {
+              userId: userId,
+              oldRole: 'creator',
+              newRole: 'user',
+              reason: 'no_workspaces_owned',
+              action: 'workspace_exit'
+            });
+            logger.info(`📡 Emitted role_updated event: creator → user for user ${userId}`);
+          } catch (socketError) {
+            logger.warn(`⚠️ Failed to emit role_updated event: ${socketError.message}`);
+          }
+        }
+      }
+    }
+
+    // 3. Socket Termination: Notify frontend for redirection
+    if (io) {
+      io.to(`user_${userId}`).emit('workspace:member_removed', {
+        workspace_id: workspaceId,
+        message: `You are no longer a member of "${workspace.name}"`
+      });
+      logger.info(`📡 Emitted workspace:member_removed to user:${userId}`);
+    }
   }
 }
 

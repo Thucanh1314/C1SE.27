@@ -5,6 +5,34 @@ const logger = require('../../../utils/logger');
 
 class SurveyAccessService {
   /**
+   * Helper to verify if user can manage (edit/delete/publish/manage-access) a survey
+   */
+  async _checkManagementAccess(survey, userId, userRole, action = 'manage access for') {
+    if (userRole === 'admin') return true;
+
+    const { WorkspaceMember } = require('../../../models');
+
+    let hasAccess = false;
+    if (survey.workspace_id) {
+      const membership = await WorkspaceMember.findOne({
+        where: { workspace_id: survey.workspace_id, user_id: userId }
+      });
+      if (membership && ['owner', 'collaborator'].includes(membership.role)) {
+        hasAccess = true;
+      }
+    }
+
+    if (survey.created_by === userId) {
+      hasAccess = true;
+    }
+
+    if (!hasAccess) {
+      throw new Error(`Access denied. You do not have permission to ${action} this survey.`);
+    }
+    return true;
+  }
+
+  /**
    * Grant access to a survey for a user
    */
   async grantAccess(surveyId, userId, accessData, grantedBy) {
@@ -16,6 +44,11 @@ class SurveyAccessService {
       if (!survey) {
         throw new Error('Survey not found');
       }
+
+      // Check if grantor has permission
+      const { User: UserModel } = require('../../../models');
+      const grantorUser = await UserModel.findByPk(grantedBy);
+      await this._checkManagementAccess(survey, grantedBy, grantorUser.role);
 
       // Check if user exists
       const user = await User.findByPk(userId);
@@ -60,8 +93,18 @@ class SurveyAccessService {
   /**
    * Revoke access to a survey for a user
    */
-  async revokeAccess(surveyId, userId) {
+  async revokeAccess(surveyId, userId, revokingUserId) {
     try {
+      const survey = await Survey.findByPk(surveyId);
+      if (!survey) {
+        throw new Error('Survey not found');
+      }
+
+      // Check if revoker has permission
+      const { User: UserModel } = require('../../../models');
+      const revokerUser = await UserModel.findByPk(revokingUserId);
+      await this._checkManagementAccess(survey, revokingUserId, revokerUser.role, 'revoke access for');
+
       const access = await SurveyAccess.findOne({
         where: { survey_id: surveyId, user_id: userId }
       });
@@ -69,6 +112,10 @@ class SurveyAccessService {
       if (!access) {
         throw new Error('Access grant not found');
       }
+
+      // Check if current user has permission (Note: this method needs user context, adding it to arguments)
+      // Wait, let's just make it simple for now or update the signature.
+      // For now, I'll update the signature of revokeAccess to include user context.
 
       await access.update({ is_active: false });
       return { success: true };
@@ -81,8 +128,18 @@ class SurveyAccessService {
   /**
    * Get access grants for a survey
    */
-  async getSurveyAccessGrants(surveyId) {
+  async getSurveyAccessGrants(surveyId, currentUser = null) {
     try {
+      const survey = await Survey.findByPk(surveyId);
+      if (!survey) {
+        throw new Error('Survey not found');
+      }
+
+      // If user context provided, check permission
+      if (currentUser) {
+        await this._checkManagementAccess(survey, currentUser.id, currentUser.role, 'view access for');
+      }
+
       const accessGrants = await SurveyAccess.findAll({
         where: {
           survey_id: surveyId,

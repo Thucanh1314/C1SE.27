@@ -34,7 +34,13 @@ export const TokenService = {
 
   getUserSync() {
     const userStr = localStorage.getItem(USER_KEY);
-    return userStr ? JSON.parse(userStr) : null;
+    if (!userStr || userStr === 'undefined') return null;
+    try {
+      return JSON.parse(userStr);
+    } catch (e) {
+      console.error('TokenService: Failed to parse user', e);
+      return null;
+    }
   },
 
   removeUser() {

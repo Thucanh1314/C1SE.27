@@ -1,0 +1,265 @@
+@use '../../styles/variables' as *;
+
+.header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #e5e7eb;
+    z-index: 1000;
+    height: 70px;
+    display: flex;
+    align-items: center;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+}
+
+.brandName {
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: #111827;
+    letter-spacing: -0.02em;
+}
+
+.desktopNav {
+    display: none;
+    gap: 2rem;
+
+    @media (min-width: 768px) {
+        display: flex;
+        align-items: center;
+    }
+}
+
+.navLink {
+    background: none;
+    border: none;
+    font-size: 0.95rem;
+    color: #4b5563;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+        color: #14B8A6;
+    }
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.loginBtn {
+    font-weight: 600;
+    color: #374151;
+    text-decoration: none;
+    font-size: 0.95rem;
+
+    &:hover {
+        color: #111827;
+    }
+
+    @media (max-width: 768px) {
+        display: none;
+    }
+}
+
+.signupBtn {
+    background: #111827;
+    color: white;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+
+    &:hover {
+        background: #000;
+        transform: translateY(-1px);
+    }
+}
+
+.mobileToggle {
+    display: block;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #374151;
+
+    @media (min-width: 768px) {
+        display: none;
+    }
+}
+
+// User Menu
+.userMenuWrapper {
+    position: relative;
+}
+
+.userButton {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    padding: 4px 12px 4px 4px;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        border-color: #d1d5db;
+        background: #f9fafb;
+    }
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    background: #14B8A6;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.userName {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.dropdown {
+    position: absolute;
+    top: 120%;
+    right: 0;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    width: 220px;
+    padding: 0.5rem;
+    animation: slideDown 0.2s ease-out;
+}
+
+.dropdownHeader {
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+
+    strong {
+        display: block;
+        color: #111827;
+        font-size: 0.9rem;
+    }
+
+    span {
+        color: #6b7280;
+        font-size: 0.8rem;
+    }
+}
+
+.dropdownDivider {
+    height: 1px;
+    background: #f3f4f6;
+    margin: 0.5rem 0;
+}
+
+.dropdownItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    width: 100%;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.9rem;
+    color: #4b5563;
+    cursor: pointer;
+    border-radius: 6px;
+    text-decoration: none;
+
+    &:hover {
+        background: #f9fafb;
+        color: #111827;
+    }
+
+    &.danger {
+        color: #ef4444;
+
+        &:hover {
+            background: #fef2f2;
+        }
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.mobileMenu {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    width: 100%;
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+
+    a,
+    button {
+        text-align: left;
+        font-size: 1rem;
+        padding: 0.5rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        color: #374151;
+    }
+
+    .mobileSignup {
+        background: #14B8A6;
+        color: white;
+        text-align: center;
+        border-radius: 6px;
+        padding: 0.75rem;
+    }
+}

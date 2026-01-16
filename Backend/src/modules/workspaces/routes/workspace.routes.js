@@ -7,9 +7,9 @@ const { authenticate, isCreatorOrAdmin } = require('../../../middleware/auth.mid
 /**
  * @route   GET /api/modules/workspaces/my
  * @desc    Get all workspaces where user is owner or member
- * @access  Private (creator/admin)
+ * @access  Private (any authenticated user)
  */
-router.get('/my', authenticate, isCreatorOrAdmin, workspaceController.getMyWorkspaces);
+router.get('/my', authenticate, workspaceController.getMyWorkspaces);
 
 /**
  * @route   POST /api/modules/workspaces/accept-invitation
@@ -38,6 +38,13 @@ router.delete('/invitations/:invitationId', authenticate, workspaceController.ca
  * @access  Private (owner only)
  */
 router.post('/invitations/:invitationId/resend', authenticate, workspaceController.resendInvitation);
+
+/**
+ * @route   POST /api/modules/workspaces/invitations/:invitationId/decline
+ * @desc    Decline an invitation
+ * @access  Private
+ */
+router.post('/invitations/:invitationId/decline', authenticate, workspaceController.declineInvitation);
 
 /**
  * @route   POST /api/modules/workspaces
@@ -82,6 +89,28 @@ router.post('/:id/members', authenticate, workspaceController.addMember);
 router.delete('/:id/members/:userId', authenticate, workspaceController.removeMember);
 
 /**
+ * @route   PATCH /api/modules/workspaces/:id/members/:userId
+ * @desc    Update member role (owner only)
+ * @access  Private
+ */
+router.patch('/:id/members/:userId', authenticate, workspaceController.updateMemberRole);
+
+/**
+ * @route   POST /api/modules/workspaces/:id/leave
+ * @desc    Leave workspace (members only, not owner)
+ * @access  Private
+ */
+router.post('/:id/leave', authenticate, workspaceController.leaveWorkspace);
+
+/**
+ * @route   POST /api/modules/workspaces/:id/transfer-ownership
+ * @desc    Transfer ownership to another member (owner only)
+ * @access  Private
+ */
+router.post('/:id/transfer-ownership', authenticate, workspaceController.transferOwnership);
+
+
+/**
  * @route   GET /api/modules/workspaces/:id/surveys
  * @desc    List surveys in a workspace (members only)
  * @access  Private
@@ -124,11 +153,18 @@ router.put('/:id', authenticate, workspaceController.updateWorkspace);
 router.delete('/:id', authenticate, workspaceController.deleteWorkspace);
 
 /**
- * @route   POST /api/modules/workspaces/:id/join
- * @desc    Join a public workspace
+ * @route   POST /api/modules/workspaces/:id/request-promotion
+ * @desc    Request a role upgrade in a workspace
  * @access  Private
  */
-router.post('/:id/join', authenticate, workspaceController.joinWorkspace);
+router.post('/:id/request-promotion', authenticate, workspaceController.requestPromotion);
+
+/**
+ * @route   POST /api/modules/workspaces/notifications/:notificationId/handle-role-request
+ * @desc    Approve or decline a role change request
+ * @access  Private (owner focus)
+ */
+router.post('/notifications/:notificationId/handle-role-request', authenticate, workspaceController.handleRoleRequest);
 
 module.exports = router;
 

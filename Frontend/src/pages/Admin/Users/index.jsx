@@ -6,27 +6,46 @@ import Pagination from '../../../components/common/Pagination/Pagination';
 import Modal from '../../../components/common/Modal/Modal';
 import ConfirmModal from '../../../components/UI/ConfirmModal';
 import styles from './UserManagement.module.scss';
+import Checkbox from '../../../components/UI/Checkbox/Checkbox';
+import Button from '../../../components/UI/Button';
+
+// Simple debounce implementation if hook doesn't exist
+const useDebounceValue = (value, delay) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+};
 
 const UserManagement = () => {
   const { showSuccess, showError } = useToast();
 
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
 
-  // Pagination
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
 
-  // Search and filter
+  // Search
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
+  const debouncedSearchTerm = useDebounceValue(searchTerm, 500);
 
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  // Selection State
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form data
@@ -41,48 +60,79 @@ const UserManagement = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await UserService.getAll();
-      // Ensure users is always an array
-      const usersData = Array.isArray(response.data) ? response.data :
-        (response.data?.users && Array.isArray(response.data.users)) ? response.data.users : [];
-      setUsers(usersData);
+      const response = await UserService.getAll({
+        page: currentPage,
+        limit: itemsPerPage,
+        search: debouncedSearchTerm,
+        role: roleFilter
+      });
+
+      // Backend returns { error: false, data: { users: [], pagination: {} } }
+      // Service.getAll returns response.data
+      const data = response.data || {};
+
+      setUsers(data.users || []);
+      if (data.pagination) {
+        setTotalPages(data.pagination.pages || 0);
+        setTotalItems(data.pagination.total || 0);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
       showError('Failed to load users');
-      setUsers([]); // Set empty array on error
+      setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, [showError]);
+  }, [currentPage, itemsPerPage, debouncedSearchTerm, roleFilter, showError]);
 
-  const filterUsers = useCallback(() => {
-    let filtered = [...users];
-
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(user =>
-        user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  // Selection Handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedUsers(users.map(u => u.id));
+    } else {
+      setSelectedUsers([]);
     }
+  };
 
-    // Apply role filter
-    if (roleFilter !== 'all') {
-      filtered = filtered.filter(user => user.role === roleFilter);
+  const handleSelectOne = (id) => {
+    setSelectedUsers(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(item => item !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const isAllSelected = users.length > 0 && users.every(u => selectedUsers.includes(u.id));
+
+  const handleBulkDelete = async () => {
+    setIsSubmitting(true);
+    try {
+      // Loop delete since backend might not support bulk yet
+      const deletePromises = selectedUsers.map(id => UserService.delete(id));
+      await Promise.all(deletePromises);
+
+      showSuccess(`${selectedUsers.length} users deleted successfully`);
+      setShowBulkDeleteModal(false);
+      setSelectedUsers([]);
+      fetchUsers();
+    } catch (error) {
+      console.error(error);
+      showError('Failed to delete selected users');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setFilteredUsers(filtered);
-    setCurrentPage(1); // Reset to first page on filter change
-  }, [users, searchTerm, roleFilter]);
+  };
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
+  // Reset to page 1 when search changes
   useEffect(() => {
-    filterUsers();
-  }, [filterUsers]);
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, roleFilter]);
 
   const handleAddUser = () => {
     setFormData({
@@ -185,11 +235,9 @@ const UserManagement = () => {
     }
   };
 
-  // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentUsers = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
 
   if (loading) {
     return <Loader fullScreen message="Loading users..." />;
@@ -202,12 +250,12 @@ const UserManagement = () => {
           <h1 className={styles.title}>User Management</h1>
           <p className={styles.subtitle}>Manage system users and their roles</p>
         </div>
-        <button className={styles.addButton} onClick={handleAddUser}>
+        <Button onClick={handleAddUser}>
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path d="M10 5v10M5 10h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
           Add User
-        </button>
+        </Button>
       </div>
 
       {/* Filters */}
@@ -228,7 +276,6 @@ const UserManagement = () => {
         </div>
 
         <div className={styles.roleFilter}>
-          <label>Role:</label>
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
@@ -242,15 +289,52 @@ const UserManagement = () => {
         </div>
 
         <div className={styles.resultCount}>
-          {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'} found
+          Total: {totalItems} users
+        </div>
+
+        <div className={styles.pageSizeControl}>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+            className={styles.select}
+          >
+            <option value={10}>10 per page</option>
+            <option value={20}>20 per page</option>
+            <option value={50}>50 per page</option>
+          </select>
         </div>
       </div>
+
+      {/* Bulk Actions Bar */}
+      {selectedUsers.length > 0 && (
+        <div className={styles.bulkActions}>
+          <span className={styles.selectedCount}>
+            {selectedUsers.length} selected
+          </span>
+          <Button
+            variant="danger"
+            onClick={() => setShowBulkDeleteModal(true)}
+            size="sm"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            Delete Selected
+          </Button>
+        </div>
+      )}
 
       {/* Users Table */}
       <div className={styles.tableContainer}>
         <table className={styles.table}>
           <thead>
             <tr>
+              <th style={{ width: '40px' }}>
+                <Checkbox
+                  checked={isAllSelected}
+                  onChange={handleSelectAll}
+                />
+              </th>
               <th>ID</th>
               <th>Full Name</th>
               <th>Email</th>
@@ -261,16 +345,22 @@ const UserManagement = () => {
             </tr>
           </thead>
           <tbody>
-            {currentUsers.length === 0 ? (
+            {users.length === 0 ? (
               <tr>
-                <td colSpan="7" className={styles.emptyState}>
+                <td colSpan="8" className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👥</div>
                   <p>No users found</p>
                 </td>
               </tr>
             ) : (
-              currentUsers.map((user) => (
-                <tr key={user.id}>
+              users.map((user) => (
+                <tr key={user.id} className={selectedUsers.includes(user.id) ? styles.selectedRow : ''}>
+                  <td>
+                    <Checkbox
+                      checked={selectedUsers.includes(user.id)}
+                      onChange={() => handleSelectOne(user.id)}
+                    />
+                  </td>
                   <td>{user.id}</td>
                   <td className={styles.nameCell}>{user.full_name}</td>
                   <td>{user.email}</td>
@@ -283,24 +373,26 @@ const UserManagement = () => {
                   <td>{new Date(user.created_at).toLocaleDateString()}</td>
                   <td>
                     <div className={styles.actions}>
-                      <button
-                        className={styles.editButton}
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => handleEditUser(user)}
                         title="Edit user"
                       >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                           <path d="M11 2l3 3-8 8H3v-3l8-8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
                         </svg>
-                      </button>
-                      <button
-                        className={styles.deleteButton}
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => handleDeleteUser(user)}
                         title="Delete user"
                       >
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                           <path d="M3 4h10M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v4M10 7v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                         </svg>
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -311,12 +403,12 @@ const UserManagement = () => {
       </div>
 
       {/* Pagination */}
-      {filteredUsers.length > itemsPerPage && (
+      {totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={setCurrentPage}
-          totalItems={filteredUsers.length}
+          onPageChange={handlePageChange}
+          totalItems={totalItems}
           itemsPerPage={itemsPerPage}
         />
       )}
@@ -391,20 +483,18 @@ const UserManagement = () => {
           </div>
 
           <div className={styles.modalActions}>
-            <button
-              className={styles.cancelButton}
+            <Button
+              variant="outline"
               onClick={() => setShowAddModal(false)}
-              disabled={isSubmitting}
             >
               Cancel
-            </button>
-            <button
-              className={styles.submitButton}
+            </Button>
+            <Button
               onClick={submitAddUser}
-              disabled={isSubmitting}
+              loading={isSubmitting}
             >
-              {isSubmitting ? 'Creating...' : 'Create User'}
-            </button>
+              Create User
+            </Button>
           </div>
         </div>
       </Modal>
@@ -476,20 +566,18 @@ const UserManagement = () => {
           </div>
 
           <div className={styles.modalActions}>
-            <button
-              className={styles.cancelButton}
+            <Button
+              variant="outline"
               onClick={() => setShowEditModal(false)}
-              disabled={isSubmitting}
             >
               Cancel
-            </button>
-            <button
-              className={styles.submitButton}
+            </Button>
+            <Button
               onClick={submitEditUser}
-              disabled={isSubmitting}
+              loading={isSubmitting}
             >
-              {isSubmitting ? 'Updating...' : 'Update User'}
-            </button>
+              Update User
+            </Button>
           </div>
         </div>
       </Modal>
@@ -503,6 +591,18 @@ const UserManagement = () => {
         message={`Are you sure you want to delete ${selectedUser?.full_name}? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
+        confirmColor="danger"
+        isLoading={isSubmitting}
+      />
+
+      {/* Bulk Delete Modal */}
+      <ConfirmModal
+        isOpen={showBulkDeleteModal}
+        onClose={() => setShowBulkDeleteModal(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Selected Users"
+        message={`Are you sure you want to delete ${selectedUsers.length} selected users? This action cannot be undone.`}
+        confirmText={`Delete ${selectedUsers.length} Users`}
         confirmColor="danger"
         isLoading={isSubmitting}
       />

@@ -9,10 +9,15 @@ import ProtectedRoute, { PublicRoute } from '../components/Layout/DefaultLayout/
 import Landing from '../pages/Landing/index.jsx';
 import Login from '../pages/Auth/Login/index.jsx';
 import Register from '../pages/Auth/Register/index.jsx';
+import WorkspaceOnboarding from '../pages/Onboarding/WorkspaceOnboarding.jsx';
+import ForgotPassword from '../pages/Auth/ForgotPassword/index.jsx';
+import ResetPassword from '../pages/Auth/ResetPassword/index.jsx';
+import AuthCallback from '../pages/Auth/AuthCallback.jsx';
 import Dashboard from '../pages/Dashboard/index.jsx';
 import AdminDashboard from '../pages/Admin/Dashboard/index.jsx';
 import CreatorDashboard from '../pages/Creator/Dashboard/index.jsx';
 import UserManagement from '../pages/Admin/Users/index.jsx';
+import UpgradeRequests from '../pages/Admin/UpgradeRequests/index.jsx';
 import TemplateList from '../pages/Templates/TemplateList/index.jsx';
 import TemplateEditor from '../pages/Templates/TemplateEditor/index.jsx';
 import SurveyList from '../pages/Surveys/SurveyList/index.jsx';
@@ -23,22 +28,17 @@ import CollectorList from '../pages/Collectors/CollectorList/index.jsx';
 import Workspaces from '../pages/Workspaces/index.jsx';
 import WorkspaceDetail from '../pages/Workspaces/WorkspaceDetail/index.jsx';
 import ManageInvitations from '../pages/Workspaces/ManageInvitations/index.jsx';
+import Invitations from '../pages/User/Invitations/index.jsx';
 import Notifications from '../pages/User/Notifications/index.jsx';
 import Chat from '../pages/Chat/index.jsx';
 import LLM from '../pages/LLM/index.jsx';
 import PublicResponseForm from '../pages/Public/ResponseForm/index.jsx';
 import WorkspaceInvitationAccept from '../pages/Public/WorkspaceInvitationAccept/index.jsx';
+import InvitationAccept from '../pages/Public/InvitationAccept/index.jsx';
 import UserResponses from '../pages/User/Responses/index.jsx';
 import Profile from '../pages/User/Profile/Profile.jsx';
 import Settings from '../pages/User/Settings/Settings.jsx';
-
-// Placeholder components for routes not yet implemented
-const ComingSoon = ({ title }) => (
-  <div style={{ padding: '2rem', textAlign: 'center' }}>
-    <h2>{title}</h2>
-    <p>This feature is coming soon!</p>
-  </div>
-);
+import AnalyticsPage from '../pages/Analytics/index.jsx';
 
 /**
  * Main Routes Configuration
@@ -62,6 +62,41 @@ const AppRoutes = () => {
           <PublicRoute>
             <Register />
           </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={<ResetPassword />}
+      />
+      {/* Backward compatibility for old links */}
+      <Route
+        path="/auth/reset-password"
+        element={<ResetPassword />}
+      />
+      <Route
+        path="/auth/callback"
+        element={
+          <PublicRoute>
+            <AuthCallback />
+          </PublicRoute>
+        }
+      />
+
+      {/* Onboarding Route - Protected as user must be logged in to create workspace */}
+      <Route
+        path="/onboarding/workspace"
+        element={
+          <ProtectedRoute>
+            <WorkspaceOnboarding />
+          </ProtectedRoute>
         }
       />
 
@@ -109,6 +144,18 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={['admin']}>
             <DefaultLayout>
               <UserManagement />
+            </DefaultLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Upgrade Requests - Admin Only */}
+      <Route
+        path="/admin/upgrade-requests"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <DefaultLayout>
+              <UpgradeRequests />
             </DefaultLayout>
           </ProtectedRoute>
         }
@@ -258,6 +305,18 @@ const AppRoutes = () => {
         }
       />
 
+      {/* Invitations Route - User */}
+      <Route
+        path="/invitations"
+        element={
+          <ProtectedRoute>
+            <DefaultLayout>
+              <Invitations />
+            </DefaultLayout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Notifications Routes - All authenticated users */}
       <Route
         path="/notifications"
@@ -300,7 +359,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute allowedRoles={['admin', 'creator']}>
             <DefaultLayout>
-              <ComingSoon title="Analytics" />
+              <AnalyticsPage />
             </DefaultLayout>
           </ProtectedRoute>
         }
@@ -310,7 +369,7 @@ const AppRoutes = () => {
       <Route
         path="/llm"
         element={
-          <ProtectedRoute allowedRoles={['admin', 'creator']}>
+          <ProtectedRoute allowedRoles={['admin', 'creator', 'user']}>
             <DefaultLayout>
               <LLM />
             </DefaultLayout>
@@ -356,6 +415,16 @@ const AppRoutes = () => {
       <Route
         path="/workspace/invitation/:inviteToken/accept"
         element={<WorkspaceInvitationAccept />}
+      />
+
+      {/* Survey Invitation Acceptance Route (public) */}
+      <Route
+        path="/invitation/:token"
+        element={<InvitationAccept />}
+      />
+      <Route
+        path="/public/invite/:token"
+        element={<InvitationAccept />}
       />
 
       {/* Profile & Settings (All authenticated users) */}

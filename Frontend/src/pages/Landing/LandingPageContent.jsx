@@ -1,323 +1,222 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import LandingHeader from './LandingHeader';
 import {
-  faRobot,
-  faChartLine,
-  faBullseye,
-  faShieldAlt,
-  faStar,
-} from '@fortawesome/free-solid-svg-icons';
+  LuPenTool,
+  LuShare2,
+  LuChartBar,
+  LuZap,
+  LuShield,
+  LuUsers,
+  LuCircleCheck
+} from 'react-icons/lu';
 import styles from './Landing.module.scss';
+// Image import removed
 
 const LandingPageContent = () => {
   const navigate = useNavigate();
 
-  const handleScrollTo = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const handleGetStarted = () => navigate('/register');
 
-  const features = [
+  const personas = [
     {
-      icon: faRobot,
-      title: 'AI-Powered Questions',
-      description:
-        'Generate intelligent, contextual questions that adapt based on previous responses.',
+      title: "Product Managers",
+      desc: "Validate ideas and gather user feedback instantly.",
+      color: "bg-blue-50 text-blue-600"
     },
     {
-      icon: faChartLine,
-      title: 'Real-time Analytics',
-      description:
-        'Get instant insights with advanced analytics powered by machine learning.',
+      title: "HR Teams",
+      desc: "Measure employee engagement and culture pulse.",
+      color: "bg-purple-50 text-purple-600"
     },
     {
-      icon: faBullseye,
-      title: 'Smart Targeting',
-      description:
-        'Reach the right audience with AI-driven participant selection and segmentation.',
-    },
-    {
-      icon: faShieldAlt,
-      title: 'Enterprise Security',
-      description:
-        'Bank-level security with advanced encryption and compliance standards.',
-    },
+      title: "Researchers",
+      desc: "Collect high-quality data with advanced logic.",
+      color: "bg-teal-50 text-teal-600"
+    }
   ];
 
-  const testimonials = [
-  {
-    initials: 'SJ',
-    name: 'Sarah Johnson',
-    role: 'Research Director, TechCorp',
-    quote:
-      "The AI-powered survey generation saved us weeks of work. The insights we're getting are incredibly detailed and actionable.",
-  },
-  {
-    initials: 'MC',
-    name: 'Michael Chen',
-    role: 'VP Marketing, DataFlow',
-    quote:
-      'The real-time analytics and adaptive questioning have revolutionized how we gather customer feedback. Highly recommended!',
-  },
-  {
-    initials: 'ER',
-    name: 'Emily Rodriguez',
-    role: 'Head of UX, InnovateLabs',
-    quote:
-      'The user role management and collaboration features make it easy for our entire team to work together on research projects.',
-  },
-];
+  const steps = [
+    { icon: LuPenTool, title: "Create", desc: "Build with AI or custom templates" },
+    { icon: LuShare2, title: "Distribute", desc: "Share via Link, Email, or QR" },
+    { icon: LuUsers, title: "Collect", desc: "Secure responses from any device" },
+    { icon: LuChartBar, title: "Analyze", desc: "Real-time insights & export" }
+  ];
 
-
-  const handleGetStarted = () => {
-    navigate('/register');
-  };
-
-  const handleLogin = () => {
-    navigate('/login');
-  };
+  const features = [
+    { icon: LuZap, title: "AI Generation", desc: "Draft surveys in seconds with simple text prompts." },
+    { icon: LuShare2, title: "Multi-channel", desc: "Reach your audience wherever they are." },
+    { icon: LuChartBar, title: "Deep Analytics", desc: "Auto-generated charts and cross-tabulation." },
+    { icon: LuShield, title: "Enterprise Ready", desc: "RBAC, data encryption, and audit logs." }
+  ];
 
   return (
-    <div className={styles['landing-container']}>
-      {/* NAVBAR */}
-      <nav className={styles['landing-nav']}>
-        <div className={styles['nav-content']}>
-        <Link
-            to="/"
-            className={styles['nav-brand']}
-            aria-label="Smart Survey AI"
-            onClick={() => {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          >
-            <div className={styles['brand-logo']}>
-              <FontAwesomeIcon icon={faRobot} />
-            </div>
-            <span className={styles['brand-text']}>
-              Smart <span className={styles['brand-highlight']}>Survey</span> AI
-            </span>
-          </Link>
-          <div className={styles['nav-links']}>
-            <button type="button" onClick={() => handleScrollTo('features')}>
-              Features
-            </button>
-            <button type="button" onClick={() => handleScrollTo('demo')}>
-              Demo
-            </button>
-            <button type="button" onClick={() => handleScrollTo('testimonials')}>
-              Testimonials
-            </button>
-            <button type="button" onClick={handleLogin}>
-              Login
-            </button>
-          </div>
+    <div className={styles.pageWrapper}>
+      <LandingHeader />
 
-          <div className={styles['nav-actions']}>
-            <button
-              type="button"
-              className={styles['btn-signup']}
-              onClick={handleGetStarted}
-            >
-              SIGN UP FREE
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      <main className={styles['landing-main']}>
-        {/* HERO */}
+      <main>
+        {/* HERO SECTION */}
         <section className={styles.hero}>
-          <div className={styles['hero-inner']}>
-           
-            <h1 className={styles['hero-title']}>
-              Smart <span>Survey</span> Applications with LLM
-            </h1>
-            <p className={styles['hero-subtitle']}>
-              Revolutionize your data collection with AI-powered surveys that adapt,
-              learn, and provide deeper insights than ever before.
-            </p>
-            <div className={styles['hero-actions']}>
-              <button
-                type="button"
-                className={styles['btn-primary']}
-                onClick={handleGetStarted}
-              >
-                GET STARTED FREE
-                <span className={styles['btn-arrow']}>›</span>
-              </button>
+          <div className={styles.container}>
+            <div className={styles.heroContent}>
+              <div className={styles.badge}>New: AI-Powered Analysis 🚀</div>
+              <h1 className={styles.heroTitle}>
+                The Operating System for <br />
+                <span className={styles.highlight}>Business Insights</span>
+              </h1>
+              <p className={styles.heroSubtitle}>
+                Create beautiful surveys, collect verifiable data, and gain actionable insights
+                without the enterprise price tag.
+              </p>
+
+              <div className={styles.heroActions}>
+                <button onClick={handleGetStarted} className={styles.primaryBtn}>
+                  Get Started Free
+                </button>
+                <button onClick={() => navigate('/demo')} className={styles.secondaryBtn}>
+                  View Live Demo
+                </button>
+              </div>
+
+              <div className={styles.trustBadge}>
+                <span>Trusted by modern teams at</span>
+                <div className={styles.logos}>
+                  <span>Acme Corp</span>
+                  <span>Globex</span>
+                  <span>Soylent</span>
+                  <span>Initech</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pseudo Dashboard Preview */}
+            <div className={styles.heroVisual}>
+              <div className={styles.dashboardMock}>
+                <div className={styles.mockHeader}>
+                  <div className={styles.dots}><span /><span /><span /></div>
+                  <div className={styles.bar} />
+                </div>
+                <div className={styles.mockBody}>
+                  <div className={styles.sidebar} />
+                  <div className={styles.content}>
+                    <div className={styles.chartArea} />
+                    <div className={styles.statsRow}>
+                      <div className={styles.statBox} />
+                      <div className={styles.statBox} />
+                      <div className={styles.statBox} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* PERSONAS SECTION */}
+        <section className={styles.sectionLight}>
+          <div className={styles.container}>
+            <div className={styles.sectionHeader}>
+              <h2>Built for every team</h2>
+              <p>Tailored features for your specific use case.</p>
+            </div>
+
+            <div className={styles.personaGrid}>
+              {personas.map((p, idx) => (
+                <div key={idx} className={styles.personaCard}>
+                  <div className={styles.checkmark}><LuCircleCheck /></div>
+                  <h3>{p.title}</h3>
+                  <p>{p.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* HOW IT WORKS */}
+        <section id="how-it-works" className={styles.section}>
+          <div className={styles.container}>
+            <div className={styles.sectionHeader}>
+              <h2>From question to insight</h2>
+              <p>A complete workflow designed for speed and quality.</p>
+            </div>
+
+            <div className={styles.stepsGrid}>
+              {steps.map((step, idx) => (
+                <div key={idx} className={styles.stepCard}>
+                  <div className={styles.stepIcon}>
+                    <step.icon size={24} />
+                  </div>
+                  <h4>{step.title}</h4>
+                  <p>{step.desc}</p>
+                  {idx < steps.length - 1 && <div className={styles.connector} />}
+                </div>
+              ))}
             </div>
           </div>
         </section>
 
         {/* FEATURES */}
-        <section id="features" className={styles.section}>
-          <div className={styles['section-header']}>
-            <h2>
-              Powerful Features for Modern <span>Surveys</span>
-            </h2>
-            <p>
-              Leverage cutting-edge AI technology to create surveys that think, adapt,
-              and deliver unprecedented insights.
-            </p>
-          </div>
+        <section id="features" className={styles.sectionLight}>
+          <div className={styles.container}>
+            <div className={styles.sectionHeader}>
+              <h2>Everything you need</h2>
+              <p>Detailed features for power users.</p>
+            </div>
 
-          <div className={styles['feature-grid']}>
-            {features.map((feature) => (
-              <div key={feature.title} className={styles['feature-card']}>
-                <div className={styles['feature-icon']}>
-                  <FontAwesomeIcon icon={feature.icon} />
+            <div className={styles.featureGrid}>
+              {features.map((f, idx) => (
+                <div key={idx} className={styles.featureItem}>
+                  <div className={styles.featureIconBox}>
+                    <f.icon size={24} />
+                  </div>
+                  <div className={styles.featureText}>
+                    <h4>{f.title}</h4>
+                    <p>{f.desc}</p>
+                  </div>
                 </div>
-                <h3>{feature.title}</h3>
-                <p>{feature.description}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* DASHBOARD DEMO */}
-        <section id="demo" className={styles['section-alt']}>
-          <div className={styles['section-header']}>
-            <h2>
-              Intuitive Dashboard for <span>Survey</span> Management
-            </h2>
-            <p>
-              Manage all your surveys from one powerful dashboard with real-time
-              insights and collaborative tools.
-            </p>
-          </div>
-
-          <div className={styles['dashboard-wrapper']}>
-            <div className={styles['dashboard-card']}>
-              <div className={styles['dashboard-header']}>
-                <span className={styles['dashboard-title']}>
-                  Smart Survey Dashboard
-                </span>
-                <div className={styles['dashboard-dots']}>
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </div>
-
-              <div className={styles['dashboard-stats']}>
-                <div className={styles['dashboard-stat']}>
-                  <p className={styles['stat-label']}>Active Surveys</p>
-                  <p className={styles['stat-value']}>24</p>
-                </div>
-                <div className={styles['dashboard-stat']}>
-                  <p className={styles['stat-label']}>Responses</p>
-                  <p className={styles['stat-value']}>1,247</p>
-                </div>
-                <div className={styles['dashboard-stat']}>
-                  <p className={styles['stat-label']}>Completion Rate</p>
-                  <p className={styles['stat-value']}>94%</p>
-                </div>
-              </div>
-
-              <div className={styles['dashboard-list']}>
-                <div className={styles['dashboard-list-header']}>
-                  <span>Recent Surveys</span>
-                  <span>Status</span>
-                </div>
-                <div className={styles['dashboard-row']}>
-                  <span>Customer Satisfaction Q4</span>
-                  <span className={`${styles['status-pill']} ${styles.active}`}>
-                    Active
-                  </span>
-                </div>
-                <div className={styles['dashboard-row']}>
-                  <span>Product Feedback Survey</span>
-                  <span className={`${styles['status-pill']} ${styles.draft}`}>
-                    Draft
-                  </span>
-                </div>
-                <div className={styles['dashboard-row']}>
-                  <span>Market Research Study</span>
-                  <span
-                    className={`${styles['status-pill']} ${styles.completed}`}
-                  >
-                    Completed
-                  </span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
 
-        {/* TESTIMONIALS */}
-       <section id="testimonials" className={styles.section}>
-  <div className={styles['section-header']}>
-    <h2>Trusted by Industry Leaders</h2>
-    <p>
-      See how companies are transforming their research with AI-powered{' '}
-      <span>surveys</span>.
-    </p>
-  </div>
-
-  <div className={styles['testimonial-grid']}>
-    {testimonials.map((item) => (
-      <div key={item.name} className={styles['testimonial-card']}>
-        <div className={styles['testimonial-stars']}>
-          {[...Array(5)].map((_, idx) => (
-            <FontAwesomeIcon
-              key={idx}
-              icon={faStar}
-              className={styles['star-icon']}
-            />
-          ))}
-        </div>
-
-        <p className={styles['testimonial-quote']}>&ldquo;{item.quote}&rdquo;</p>
-
-        <div className={styles['testimonial-footer']}>
-          <div className={styles['testimonial-avatar']}>{item.initials}</div>
-          <div className={styles['testimonial-meta']}>
-            <p className={styles['testimonial-name']}>{item.name}</p>
-            <p className={styles['testimonial-role']}>{item.role}</p>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
-</section>
-
-
-        {/* FINAL CTA */}
-        <section className={styles['section-alt']}>
-          <div className={styles['cta-inner']}>
-            <h2>
-              Ready to Transform Your <span>Survey</span> Experience?
-            </h2>
-            <p>
-              Join thousands of companies already using AI-powered surveys to gather
-              better insights faster.
-            </p>
-            <button
-              type="button"
-              className={styles['btn-primary']}
-              onClick={handleGetStarted}
-            >
-              START FREE TRIAL
-              <span className={styles['btn-arrow']}>›</span>
+        {/* BOTTOM CTA */}
+        <section className={styles.ctaSection}>
+          <div className={styles.ctaContainer}>
+            <h2>Start collecting insights today</h2>
+            <p>Join key decision makers who trust ALLMTAGS.</p>
+            <button onClick={handleGetStarted} className={styles.whiteBtn}>
+              Create Free Account
             </button>
-            <p className={styles['cta-note']}>
-              No credit card required · 14-day free trial · Cancel anytime
-            </p>
           </div>
         </section>
+
       </main>
 
-      {/* FOOTER */}
-     <footer className={styles['landing-footer']}>
-        <div className={styles['footer-content']}>
-          <span className={styles['footer-logo']}>
-            Smart <span>Survey</span> AI
-          </span>
-
-          <span className={styles['footer-copy']}>
-            © 2025 Smart Survey AI. Proudly created by team C1.SE27. All rights reserved.
-          </span>
+      <footer className={styles.footer}>
+        <div className={styles.container}>
+          <div className={styles.footerRow}>
+            <div className={styles.footerBrand}>
+              <strong>ALLMTAGS</strong>
+              <p>Advanced Survey Intelligence Platform</p>
+            </div>
+            <div className={styles.footerLinks}>
+              <div className={styles.col}>
+                <h4>Product</h4>
+                <Link to="/">Features</Link>
+                <Link to="/">Pricing</Link>
+                <Link to="/">Enterprise</Link>
+              </div>
+              <div className={styles.col}>
+                <h4>Company</h4>
+                <Link to="/">About</Link>
+                <Link to="/">Careers</Link>
+                <Link to="/">Contact</Link>
+              </div>
+            </div>
+          </div>
+          <div className={styles.footerBottom}>
+            <p>© 2025 ALLMTAGS. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>

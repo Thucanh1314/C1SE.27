@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const templateController = require('../controller/template.controller');
 const { authenticate, isTeacherOrAdmin } = require('../../../middleware/auth.middleware');
+const { requireCreatorRole } = require('../../../middleware/roleCreatorCheck.middleware');
 
 /**
  * @route   GET /api/templates/question-types
@@ -28,16 +29,16 @@ router.get('/:id', authenticate, templateController.getTemplateById);
 /**
  * @route   POST /api/templates
  * @desc    Create new template
- * @access  Private (Creator/Admin only)
+ * @access  Private (Creator only - requires system role 'creator')
  */
-router.post('/', authenticate, isTeacherOrAdmin, templateController.createTemplate);
+router.post('/', authenticate, requireCreatorRole, templateController.createTemplate);
 
 /**
  * @route   PUT /api/templates/:id
  * @desc    Update template
- * @access  Private (Owner/Admin only)
+ * @access  Private (Creator only - requires system role 'creator')
  */
-router.put('/:id', authenticate, isTeacherOrAdmin, templateController.updateTemplate);
+router.put('/:id', authenticate, requireCreatorRole, templateController.updateTemplate);
 
 /**
  * @route   DELETE /api/templates/bulk
@@ -56,8 +57,8 @@ router.delete('/:id', authenticate, isTeacherOrAdmin, templateController.deleteT
 /**
  * @route   POST /api/templates/:id/questions
  * @desc    Add question to template
- * @access  Private (Owner/Admin only)
+ * @access  Private (Creator only - requires system role 'creator')
  */
-router.post('/:id/questions', authenticate, isTeacherOrAdmin, templateController.addQuestion);
+router.post('/:id/questions', authenticate, requireCreatorRole, templateController.addQuestion);
 
 module.exports = router;

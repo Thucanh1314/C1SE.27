@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import WorkspaceService from '../../../api/services/workspace.service';
 import CollectorService from '../../../api/services/collector.service';
@@ -7,19 +7,54 @@ import Loader from '../../../components/common/Loader/Loader';
 import Modal from '../../../components/common/Modal/Modal';
 import ConfirmModal from '../../../components/UI/ConfirmModal';
 import styles from './WorkspaceDetail.module.scss';
+import {
+  LuLayoutDashboard,
+  LuUsers,
+  LuFileText,
+  LuActivity,
+  LuSettings,
+  LuTrash2,
+  LuLogOut,
+  LuUserPlus,
+  LuClipboardList,
+  LuGlobe,
+  LuLock,
+  LuPencil,
+  LuPlay,
+  LuChartBar,
+  LuFilePlus,
+  LuCircleArrowUp,
+  LuBrain,
+  LuUser,
+  LuFilePen
+} from 'react-icons/lu';
+import socketService from '../../../api/services/socket.service';
+import SurveyService from '../../../api/services/survey.service';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useNotificationTriggers } from '../../../components/Notifications';
+import UpgradeModal from '../../../components/UpgradeToCreator/UpgradeModal';
+import UpgradeUpsellModal from '../../../components/UI/UpgradeUpsellModal/UpgradeUpsellModal';
+import InvitationWarningModal from '../../../components/UI/InvitationWarningModal/InvitationWarningModal';
+import Button from '../../../components/UI/Button';
+import UserService from '../../../api/services/user.service';
 
 const WorkspaceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth(); // Get current user
+  const notificationTriggers = useNotificationTriggers();
 
   const [loading, setLoading] = useState(true);
   const [workspace, setWorkspace] = useState(null);
-  const [members, setMembers] = useState([]);
   const [surveys, setSurveys] = useState([]);
   const [activities, setActivities] = useState([]);
-  const [activeTab, setActiveTab] = useState('overview');
-  
+  const [activeTab, setActiveTab] = useState(() => {
+    // Read initial tab from URL hash or default to 'overview'
+    const hash = window.location.hash.replace('#', '');
+    return ['overview', 'members', 'surveys', 'activities'].includes(hash) ? hash : 'overview';
+  });
+
   // Invite modal
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteForm, setInviteForm] = useState({
@@ -37,6 +72,29 @@ const WorkspaceDetail = () => {
   });
   const [updating, setUpdating] = useState(false);
 
+  // Delete survey modal
+  const [showDeleteSurveyModal, setShowDeleteSurveyModal] = useState(false);
+  const [surveyToDelete, setSurveyToDelete] = useState(null);
+
+  // Handle tab change with URL hash update
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    window.location.hash = tabName;
+  };
+
+  // Listen for hash changes to sync tab state
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['overview', 'members', 'surveys', 'activities'].includes(hash)) {
+        setActiveTab(hash);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   // Delete confirmation
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -45,40 +103,62 @@ const WorkspaceDetail = () => {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState(null);
 
-  useEffect(() => {
-    loadWorkspaceData();
-  }, [id]);
+  // Leave workspace confirmation
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
-  const loadWorkspaceData = async () => {
+  // Upgrade & Upsell Modals
+  const [showUpsellModal, setShowUpsellModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // Invitation warning
+  const [showInviteWarning, setShowInviteWarning] = useState(false);
+  const [pendingInvitation, setPendingInvitation] = useState(null);
+
+  const handleDeleteSurvey = (survey) => {
+    setSurveyToDelete(survey);
+    setShowDeleteSurveyModal(true);
+  };
+
+  const confirmDeleteSurvey = async () => {
+    if (!surveyToDelete) return;
+    setDeleting(true);
+    try {
+      const result = await SurveyService.deleteSurvey(surveyToDelete.id);
+      if (result && (result.success || result.ok)) {
+        showToast('Survey deleted successfully', 'success');
+        loadWorkspaceData(); // Refresh list
+      } else {
+        showToast('Failed to delete survey', 'error');
+      }
+    } catch (e) {
+      showToast('Error deleting survey', 'error');
+    } finally {
+      setDeleting(false);
+      setShowDeleteSurveyModal(false);
+      setSurveyToDelete(null);
+    }
+  };
+
+
+  const loadWorkspaceData = useCallback(async () => {
     setLoading(true);
     try {
-      // Load workspace details
-      const workspaceResult = await WorkspaceService.getWorkspaceById(id);
-      console.log('🔍 [WorkspaceDetail] Workspace API result:', workspaceResult);
+      const [workspaceResult, activitiesResult] = await Promise.all([
+        WorkspaceService.getWorkspaceById(id),
+        WorkspaceService.getWorkspaceActivities(id)
+      ]);
+
       if (workspaceResult.ok) {
-        console.log('✅ [WorkspaceDetail] Workspace data:', workspaceResult.data);
         setWorkspace(workspaceResult.data);
-        // Set surveys from workspace data
         setSurveys(workspaceResult.data.surveys || []);
-        // Initialize edit form with current workspace data
         setEditForm({
           name: workspaceResult.data.name || '',
           description: workspaceResult.data.description || '',
           visibility: workspaceResult.data.visibility || 'private'
         });
-      } else {
-        showToast(workspaceResult.error || 'Failed to load workspace', 'error');
-        return;
       }
 
-      // Load members
-      const membersResult = await WorkspaceService.getWorkspaceMembers(id);
-      if (membersResult.ok) {
-        setMembers(membersResult.members || []);
-      }
-
-      // Load activities
-      const activitiesResult = await WorkspaceService.getWorkspaceActivities(id);
       if (activitiesResult.ok) {
         setActivities(activitiesResult.activities || []);
       }
@@ -87,11 +167,112 @@ const WorkspaceDetail = () => {
     } finally {
       setLoading(false);
     }
+  }, [id, showToast]);
+
+  useEffect(() => {
+    loadWorkspaceData();
+  }, [loadWorkspaceData]);
+
+  // Real-time activity updates
+  useEffect(() => {
+    if (!id) return;
+
+    // Ensure socket is initialized
+    socketService.init();
+
+    // Join workspace room
+    socketService.joinRoom(`workspace_${id}`);
+
+    const handleNewActivity = (newActivity) => {
+      setActivities(prev => {
+        // Prevent duplicates
+        if (prev.some(a => a.id === newActivity.id)) return prev;
+        return [newActivity, ...prev].slice(0, 50);
+      });
+    };
+
+    const unsubscribe = socketService.on('workspaceActivity', handleNewActivity);
+
+    return () => {
+      unsubscribe();
+      socketService.leaveRoom(`workspace_${id}`);
+    };
+  }, [id]);
+
+  // Handle removal from workspace
+  useEffect(() => {
+    const handleRemoved = (data) => {
+      if (parseInt(data.workspace_id) === parseInt(id)) {
+        showToast(data.message || 'You have been removed from this workspace', 'info');
+        navigate('/workspaces');
+      }
+    };
+
+    const unsubscribe = socketService.on('workspaceMemberRemoved', handleRemoved);
+    return () => unsubscribe();
+  }, [id, navigate, showToast]);
+
+  const getActivityIcon = (action) => {
+    switch (action) {
+      case 'survey_created': return <LuFilePlus />;
+      case 'survey_updated': return <LuFilePen />;
+      case 'survey_deleted': return <LuTrash2 />;
+      case 'member_invited': return <LuUserPlus />;
+      case 'joined': return <LuUser />;
+      case 'member_role_updated': return <LuCircleArrowUp />;
+      case 'analysis_finished': return <LuBrain />;
+      case 'left': return <LuLogOut />;
+      case 'member_removed': return <LuTrash2 />;
+      case 'role_mismatch_warning': return <LuLock />;
+      default: return <LuActivity />;
+    }
+  };
+
+  const getActivityMessage = (activity) => {
+    const actorName = activity.user?.full_name || activity.user?.username || 'System';
+    const targetName = activity.metadata?.title || activity.metadata?.workspace_name || activity.metadata?.invitee_email || '';
+
+    switch (activity.action) {
+      case 'survey_created':
+        return <span><strong>{actorName}</strong> created survey <strong>"{targetName}"</strong></span>;
+      case 'survey_updated':
+        return <span><strong>{actorName}</strong> updated survey <strong>"{targetName}"</strong></span>;
+      case 'survey_deleted':
+        return <span><strong>{actorName}</strong> deleted survey <strong>"{targetName}"</strong></span>;
+      case 'member_invited':
+        return <span><strong>{actorName}</strong> invited <strong>{targetName}</strong> to the workspace</span>;
+      case 'joined':
+        return <span><strong>{actorName}</strong> joined the workspace</span>;
+      case 'member_role_updated':
+        return <span><strong>{actorName}</strong> updated the role of a member</span>;
+      case 'analysis_finished':
+        return <span>AI analysis finished for <strong>"{targetName}"</strong></span>;
+      case 'left':
+        return <span><strong>{actorName}</strong> left the workspace</span>;
+      case 'member_removed':
+        return <span><strong>{actorName}</strong> removed a member</span>;
+      case 'role_mismatch_warning':
+        return <span className={styles.warningMessage}>{activity.metadata?.warning || 'System role mismatch detected for invited member.'}</span>;
+      default:
+        return <span><strong>{actorName}</strong> performed: {activity.action?.replace(/_/g, ' ')}</span>;
+    }
+  };
+
+  const formatRelativeTime = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    return date.toLocaleDateString();
   };
 
   const handleInvite = async (e) => {
-    e.preventDefault();
-    
+    if (e) e.preventDefault();
+
     if (!inviteForm.email.trim()) {
       showToast('Email is required', 'error');
       return;
@@ -99,17 +280,39 @@ const WorkspaceDetail = () => {
 
     setInviting(true);
     try {
-      const result = await WorkspaceService.inviteToWorkspace(
-        id, 
-        inviteForm.email.trim(), 
-        inviteForm.role
-      );
+      // 1. Check user system role first
+      const userCheck = await UserService.getAll({ search: inviteForm.email.trim() });
+      // The backend returns { error: false, data: { users: [], ... } }
+      // userCheck is response.data
+      const invitedUser = userCheck.data?.users?.find(u => u.email === inviteForm.email.trim());
+
+      if (invitedUser && invitedUser.role === 'user' && ['collaborator', 'viewer'].includes(inviteForm.role)) {
+        setPendingInvitation({ email: inviteForm.email.trim(), role: inviteForm.role });
+        setShowInviteWarning(true);
+        setInviting(false);
+        return;
+      }
+
+      await executeInvitation(inviteForm.email.trim(), inviteForm.role);
+    } catch (error) {
+      showToast('Error checking user role', 'error');
+      setInviting(false);
+    }
+  };
+
+  const executeInvitation = async (email, role) => {
+    setInviting(true);
+    try {
+      const result = await WorkspaceService.inviteToWorkspace(id, email, role);
 
       if (result.ok) {
         showToast('Invitation sent successfully', 'success');
         setShowInviteModal(false);
         setInviteForm({ email: '', role: 'member' });
-        // Refresh activities to show invitation activity
+
+        if (result.invitedUserId) {
+          await notificationTriggers.sendWorkspaceInvitation(id, result.invitedUserId, role);
+        }
         loadWorkspaceData();
       } else {
         showToast(result.error || 'Failed to send invitation', 'error');
@@ -118,6 +321,7 @@ const WorkspaceDetail = () => {
       showToast('Error sending invitation', 'error');
     } finally {
       setInviting(false);
+      setShowInviteWarning(false);
     }
   };
 
@@ -147,7 +351,7 @@ const WorkspaceDetail = () => {
 
   const handleUpdateWorkspace = async (e) => {
     e.preventDefault();
-    
+
     if (!editForm.name.trim()) {
       showToast('Workspace name is required', 'error');
       return;
@@ -195,6 +399,27 @@ const WorkspaceDetail = () => {
     }
   };
 
+  const handleLeaveWorkspace = async () => {
+    setLeaving(true);
+    try {
+      const result = await WorkspaceService.leaveWorkspace(id);
+
+      if (result.ok) {
+        showToast('Successfully left workspace', 'success');
+        // Navigate back to workspaces list
+        navigate('/workspaces');
+      } else {
+        showToast(result.error || 'Failed to leave workspace', 'error');
+      }
+    } catch (error) {
+      showToast('Error leaving workspace', 'error');
+    } finally {
+      setLeaving(false);
+      setShowLeaveModal(false);
+    }
+  };
+
+
   const getRoleBadgeClass = (role) => {
     switch (role) {
       case 'owner': return styles.roleOwner;
@@ -205,21 +430,48 @@ const WorkspaceDetail = () => {
     }
   };
 
-  const formatActivityAction = (action) => {
-    const actionMap = {
-      'created': 'created the workspace',
-      'joined': 'joined the workspace',
-      'left': 'left the workspace',
-      'survey_created': 'created a survey',
-      'survey_updated': 'updated a survey',
-      'survey_deleted': 'deleted a survey',
-      'member_invited': 'invited a member',
-      'member_removed': 'removed a member'
-    };
-    return actionMap[action] || action;
+
+  const getNextAction = () => {
+    const canManage = ['owner', 'collaborator'].includes(workspace.current_user_role || workspace.role);
+    const canViewResults = ['owner', 'collaborator', 'viewer'].includes(workspace.current_user_role || workspace.role);
+
+    // No surveys → suggest creating first survey
+    if (canManage && (!surveys || surveys.length === 0)) {
+      return {
+        message: 'Create your first survey',
+        action: () => navigate('/templates'),
+        buttonText: 'Create Survey'
+      };
+    }
+
+    // Has surveys but none distributed → suggest distributing
+    const hasActiveSurveys = surveys.some(s => s.status === 'active' || s.status === 'published');
+    if (canManage && !hasActiveSurveys && surveys.length > 0) {
+      return {
+        message: 'Distribute a survey',
+        action: () => navigate(`/surveys/${surveys[0].id}/distribute`),
+        buttonText: 'Distribute Survey'
+      };
+    }
+
+    // Has active surveys → suggest viewing analytics
+    if (canViewResults && hasActiveSurveys) {
+      return {
+        message: 'View analytics',
+        action: () => navigate('/analytics'),
+        buttonText: 'View Analytics'
+      };
+    }
+
+    return null;
+  };
+
+  const isLockedForRoleMismatch = () => {
+    return user?.role === 'user' && ['owner', 'collaborator'].includes(workspace.current_user_role || workspace.role);
   };
 
   const handleTakeSurvey = async (survey) => {
+
     try {
       // Create a workspace collector for this survey
       const result = await CollectorService.createWorkspaceCollector(survey.id, {
@@ -240,6 +492,29 @@ const WorkspaceDetail = () => {
     }
   };
 
+  const handleRequestPromotion = async () => {
+    try {
+      const result = await WorkspaceService.requestPromotion(id, 'collaborator');
+      if (result.ok) {
+        showToast('Promotion request sent to owner', 'success');
+
+        // Send role request notification to workspace owner
+        if (workspace?.owner_id) {
+          await notificationTriggers.sendRoleRequestNotification(
+            id,
+            workspace.owner_id,
+            'collaborator',
+            'promotion'
+          );
+        }
+      } else {
+        showToast(result.message || 'Failed to request promotion', 'error');
+      }
+    } catch (error) {
+      showToast('Error requesting promotion', 'error');
+    }
+  };
+
   if (loading) {
     return <Loader />;
   }
@@ -253,10 +528,11 @@ const WorkspaceDetail = () => {
     );
   }
 
-  const canInvite = workspace.role === 'owner' || workspace.role === 'collaborator';
-  const canRemoveMembers = workspace.role === 'owner';
-  const canEditWorkspace = workspace.role === 'owner';
-  const canDeleteWorkspace = workspace.role === 'owner';
+  const canInvite = (workspace.current_user_role || workspace.role) === 'owner';
+  const canRemoveMembers = (workspace.current_user_role || workspace.role) === 'owner';
+  const canEditWorkspace = (workspace.current_user_role || workspace.role) === 'owner';
+  const canDeleteWorkspace = (workspace.current_user_role || workspace.role) === 'owner';
+
 
 
 
@@ -264,83 +540,122 @@ const WorkspaceDetail = () => {
     <div className={styles.workspaceDetail}>
       <div className={styles.header}>
         <div className={styles.headerContent}>
-          <h1>{workspace.name}</h1>
+          <div className={styles.titleRow}>
+            <h1>{workspace.name}</h1>
+            <span className={`${styles.roleBadge} ${getRoleBadgeClass(workspace.current_user_role || workspace.role)}`}>
+              {(workspace.current_user_role || workspace.role).charAt(0).toUpperCase() + (workspace.current_user_role || workspace.role).slice(1)}
+            </span>
+          </div>
           {workspace.description && (
             <p className={styles.description}>{workspace.description}</p>
           )}
+
           <div className={styles.metadata}>
-            <span className={`${styles.roleBadge} ${getRoleBadgeClass(workspace.role)}`}>
-              {workspace.role}
-            </span>
-            <span className={styles.memberCount}>
-              {(workspace?.members || []).length} {(workspace?.members || []).length === 1 ? 'member' : 'members'}
-            </span>
-            <span className={styles.surveyCount}>
-              {(surveys || []).length} {(surveys || []).length === 1 ? 'survey' : 'surveys'}
-            </span>"
+            <div className={styles.metaItem}>
+              <LuUsers size={16} />
+              <span>{(workspace?.members || []).length} members</span>
+            </div>
+            <div className={styles.divider}>•</div>
+            <div className={styles.metaItem}>
+              <LuFileText size={16} />
+              <span>{(surveys || []).length} surveys</span>
+            </div>
           </div>
         </div>
-        
+
         <div className={styles.headerActions}>
           {canInvite && (
-            <button 
-              className={styles.inviteButton}
+            <Button
               onClick={() => setShowInviteModal(true)}
             >
-              + Invite Members
-            </button>
+              <LuUserPlus size={16} /> Invite
+            </Button>
           )}
           {canInvite && (
-            <button 
-              className={styles.manageInvitationsButton}
+            <Button
+              variant="outline"
               onClick={() => navigate(`/workspaces/${id}/invitations`)}
+              title="Manage Invitations"
             >
-              📋 Manage Invitations
-            </button>
+              <LuClipboardList size={16} /> <span>Invitations</span>
+            </Button>
           )}
           {canEditWorkspace && (
-            <button 
-              className={styles.editButton}
+            <Button
+              variant="outline"
               onClick={() => setShowEditModal(true)}
+              title="Settings"
             >
-              Edit Workspace
-            </button>
+              <LuSettings size={16} /> <span>Settings</span>
+            </Button>
           )}
           {canDeleteWorkspace && (
-            <button 
-              className={styles.deleteButton}
+            <Button
+              variant="danger"
               onClick={() => setShowDeleteModal(true)}
+              title="Delete Workspace"
             >
-              Delete Workspace
-            </button>
+              <LuTrash2 size={16} /> <span>Delete</span>
+            </Button>
+          )}
+
+          {/* Promotion / Upgrade Logic */}
+          {(workspace.current_user_role || workspace.role) !== 'owner' && (
+            <>
+              {isLockedForRoleMismatch() ? (
+                <Button
+                  onClick={() => setShowUpgradeModal(true)}
+                  title="Upgrade to Creator"
+                >
+                  <LuCircleArrowUp size={16} /> <span>Upgrade to Creator</span>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={handleRequestPromotion}
+                  title="Request Promotion to Collaborator"
+                >
+                  <LuCircleArrowUp size={16} /> <span>Request Promotion</span>
+                </Button>
+              )}
+            </>
+          )}
+
+          {(workspace.current_user_role || workspace.role) !== 'owner' && (
+            <Button
+              variant="danger"
+              onClick={() => setShowLeaveModal(true)}
+            >
+              <LuLogOut size={16} /> Leave
+            </Button>
           )}
         </div>
       </div>
 
       <div className={styles.tabs}>
-        <button 
+        <button
           className={`${styles.tab} ${activeTab === 'overview' ? styles.active : ''}`}
-          onClick={() => setActiveTab('overview')}
+          onClick={() => handleTabChange('overview')}
         >
-          Overview
+          <LuLayoutDashboard size={18} /> Overview
         </button>
-        <button 
+        <button
           className={`${styles.tab} ${activeTab === 'members' ? styles.active : ''}`}
-          onClick={() => setActiveTab('members')}
+          onClick={() => handleTabChange('members')}
         >
-          Members ({(workspace?.members || []).length})
+          <LuUsers size={18} /> Members ({(workspace?.members || []).length})
         </button>
-        <button 
+        <button
           className={`${styles.tab} ${activeTab === 'surveys' ? styles.active : ''}`}
-          onClick={() => setActiveTab('surveys')}
+          onClick={() => handleTabChange('surveys')}
         >
-          Surveys ({(surveys || []).length})
+          <LuFileText size={18} /> Surveys ({(surveys || []).length})
         </button>
-        <button 
+        <button
           className={`${styles.tab} ${activeTab === 'activities' ? styles.active : ''}`}
-          onClick={() => setActiveTab('activities')}
+          onClick={() => handleTabChange('activities')}
         >
-          Activities
+          <LuActivity size={18} /> Activities
         </button>
       </div>
 
@@ -351,19 +666,50 @@ const WorkspaceDetail = () => {
               <div className={styles.statCard}>
                 <h3>Members</h3>
                 <div className={styles.statValue}>{(workspace?.members || []).length}</div>
-                <p className={styles.statLabel}>Active members in workspace</p>
+                <p className={styles.statLabel}>
+                  {(workspace?.members || []).length === 0
+                    ? 'Invite team members to collaborate'
+                    : (workspace?.members || []).length === 1
+                      ? 'Add more collaborators'
+                      : 'Collaborating on surveys'}
+                </p>
               </div>
               <div className={styles.statCard}>
                 <h3>Surveys</h3>
                 <div className={styles.statValue}>{(surveys || []).length}</div>
-                <p className={styles.statLabel}>Total surveys created</p>
+                <p className={styles.statLabel}>
+                  {(surveys || []).length === 0
+                    ? 'Create your first survey'
+                    : `${surveys.filter(s => s.status === 'active').length} active, ${surveys.filter(s => s.status === 'draft').length} draft`}
+                </p>
               </div>
               <div className={styles.statCard}>
                 <h3>Recent Activity</h3>
                 <div className={styles.statValue}>{(activities || []).length}</div>
-                <p className={styles.statLabel}>Recent workspace activities</p>
+                <p className={styles.statLabel}>
+                  {(activities || []).length === 0
+                    ? 'No activity yet'
+                    : (activities || []).length === 1
+                      ? 'Latest workspace action'
+                      : 'Workspace actions logged'}
+                </p>
               </div>
             </div>
+
+            {/* Next Action Section */}
+            {getNextAction() && (
+              <div className={styles.nextAction}>
+                <h3>Next Action</h3>
+                <div className={styles.nextActionContent}>
+                  <p className={styles.nextActionMessage}>{getNextAction().message}</p>
+                  <Button
+                    onClick={getNextAction().action}
+                  >
+                    {getNextAction().buttonText}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className={styles.recentActivities}>
               <h3>Recent Activities</h3>
@@ -373,7 +719,7 @@ const WorkspaceDetail = () => {
                     {activity.user?.full_name || activity.user?.username}
                   </div>
                   <div className={styles.activityAction}>
-                    {formatActivityAction(activity.action)}
+                    {getActivityMessage(activity)}
                   </div>
                   <div className={styles.activityTime}>
                     {new Date(activity.created_at).toLocaleDateString()}
@@ -382,6 +728,17 @@ const WorkspaceDetail = () => {
               ))}
               {(activities || []).length === 0 && (
                 <p className={styles.noData}>No recent activities</p>
+              )}
+              {(activities || []).length > 5 && (
+                <div className={styles.viewAllLink}>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setActiveTab('activities')}
+                    size="sm"
+                  >
+                    View all activity ({(activities || []).length} total)
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -392,12 +749,12 @@ const WorkspaceDetail = () => {
             <div className={styles.sectionHeader}>
               <h3>Workspace Members</h3>
               {canInvite && (
-                <button 
-                  className={styles.inviteButton}
+                <Button
+                  size="sm"
                   onClick={() => setShowInviteModal(true)}
                 >
                   + Invite Member
-                </button>
+                </Button>
               )}
             </div>
             <div className={styles.membersList}>
@@ -426,7 +783,7 @@ const WorkspaceDetail = () => {
                   </div>
                   <div className={styles.memberActions}>
                     {canRemoveMembers && member.role !== 'owner' && (
-                      <button 
+                      <button
                         className={styles.removeButton}
                         onClick={() => handleRemoveMember(member.user_id, member.username)}
                         title="Remove member"
@@ -439,8 +796,15 @@ const WorkspaceDetail = () => {
               ))}
               {(workspace?.members || []).length === 0 && (
                 <div className={styles.emptyState}>
+                  <div className={styles.emptyIcon}>
+                    <LuUsers size={32} />
+                  </div>
                   <p>No members yet</p>
-                  <p className={styles.emptyStateSubtext}>Invite team members to collaborate on surveys</p>
+                  <p className={styles.emptyStateSubtext}>
+                    {['owner', 'collaborator'].includes(workspace.current_user_role || workspace.role)
+                      ? 'Invite team members to collaborate on surveys'
+                      : 'Team members will appear here once invited by the owner'}
+                  </p>
                 </div>
               )}
             </div>
@@ -451,51 +815,127 @@ const WorkspaceDetail = () => {
           <div className={styles.surveys}>
             <div className={styles.sectionHeader}>
               <h3>Workspace Surveys</h3>
+              {['owner', 'collaborator'].includes(workspace.current_user_role || workspace.role) && (
+                <Button
+                  onClick={() => navigate('/templates')}
+                >
+                  <LuFilePlus size={18} />
+                  + Create Survey
+                </Button>
+              )}
             </div>
             <div className={styles.surveysList}>
-              {(surveys || []).map((survey) => (
-                <div key={survey.id} className={styles.surveyCard}>
-                  <div className={styles.surveyHeader}>
-                    <h4 className={styles.surveyTitle}>{survey.title}</h4>
-                    <span className={`${styles.statusBadge} ${styles[`status${survey.status}`]}`}>
-                      {survey.status}
-                    </span>
+              {(surveys || []).map((survey) => {
+                const isCreator = user?.id === survey.created_by;
+                const canManage = ['owner', 'collaborator'].includes(workspace.current_user_role || workspace.role);
+                const canViewResults = ['owner', 'collaborator', 'viewer'].includes(workspace.current_user_role || workspace.role);
+
+                return (
+                  <div key={survey.id} className={styles.surveyCard}>
+                    <div className={styles.surveyHeader}>
+                      <h4 className={styles.surveyTitle}>{survey.title}</h4>
+                      <span className={`${styles.statusBadge} ${styles[`status${survey.status}`]}`}>
+                        {survey.status}
+                      </span>
+                    </div>
+                    <div className={styles.surveyMeta}>
+                      <span className={styles.surveyVisibility}>
+                        {survey.visibility === 'public' ? (
+                          <><LuGlobe size={14} /> Public</>
+                        ) : (
+                          <><LuLock size={14} /> Workspace Only</>
+                        )}
+                      </span>
+                      <span className={styles.surveyCreated}>
+                        {isCreator ? 'Created by You' : `Created by ${survey.created_by === workspace?.owner_id ? 'Owner' : 'Collaborator'}`}
+                      </span>
+                    </div>
+
+                    <div className={styles.surveyActions}>
+                      {/* EDIT / BUILDER */}
+                      {canManage && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => {
+                            if (isLockedForRoleMismatch()) {
+                              setShowUpsellModal(true);
+                            } else {
+                              navigate(`/surveys/${survey.id}/edit`);
+                            }
+                          }}
+                          title={isLockedForRoleMismatch() ? "Upgrade to edit" : "Edit Survey"}
+                        >
+                          {isLockedForRoleMismatch() ? <LuLock size={16} /> : <LuPencil size={16} />}
+                          <span className={styles.btnText}>Edit</span>
+                        </Button>
+                      )}
+
+                      {/* ANALYTICS */}
+                      {canViewResults && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => navigate(`/surveys/${survey.id}/analytics`)}
+                          title="View Results"
+                        >
+                          <LuChartBar size={16} /> <span className={styles.btnText}>Results</span>
+                        </Button>
+                      )}
+
+                      {/* TAKE SURVEY */}
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleTakeSurvey(survey)}
+                        title="Take Survey"
+                      >
+                        <LuPlay size={16} /> <span className={styles.btnText}>Take</span>
+                      </Button>
+
+                      {/* DELETE */}
+                      {canManage && (
+                        <Button
+                          variant="danger"
+                          onClick={() => {
+                            if (isLockedForRoleMismatch()) {
+                              setShowUpsellModal(true);
+                            } else {
+                              handleDeleteSurvey(survey);
+                            }
+                          }}
+                          title={isLockedForRoleMismatch() ? "Upgrade to delete" : "Delete Survey"}
+                        >
+                          {isLockedForRoleMismatch() ? <LuLock size={16} /> : <LuTrash2 size={16} />}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className={styles.surveyMeta}>
-                    <span className={styles.surveyVisibility}>
-                      {survey.visibility === 'public' ? '🌐 Public' : '👥 Workspace Only'}
-                    </span>
-                    <span className={styles.surveyCreated}>
-                      Created by {survey.created_by === workspace?.owner_id ? 'Owner' : 'Collaborator'}
-                    </span>
-                  </div>
-                  <div className={styles.surveyActions}>
-                    <button 
-                      className={styles.viewSurveyButton}
-                      onClick={() => navigate(`/surveys/${survey.id}/detail`)}
-                    >
-                      View Survey
-                    </button>
-                    <button 
-                      className={styles.takeSurveyButton}
-                      onClick={() => handleTakeSurvey(survey)}
-                      title="Take this survey as a respondent"
-                    >
-                      Take Survey
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {(surveys || []).length === 0 && (
                 <div className={styles.emptyState}>
+                  <div className={styles.emptyIcon}>
+                    <LuFilePlus size={32} />
+                  </div>
                   <p>No surveys yet</p>
-                  <p className={styles.emptyStateSubtext}>Create your first survey to get started</p>
-                  <button 
-                    className={styles.createSurveyButton}
-                    onClick={() => navigate('/surveys/new')}
-                  >
-                    + Create Survey
-                  </button>
+                  <p className={styles.emptyStateSubtext}>
+                    {['owner', 'collaborator'].includes(workspace.current_user_role || workspace.role)
+                      ? 'Create your first survey to get started'
+                      : 'Surveys will appear here once created by owners or collaborators'}
+                  </p>
+                  {['owner', 'collaborator'].includes(workspace.current_user_role || workspace.role) && (
+                    <button
+                      className={styles.createSurveyButton}
+                      onClick={() => {
+                        if (isLockedForRoleMismatch()) {
+                          setShowUpsellModal(true);
+                        } else {
+                          navigate('/templates');
+                        }
+                      }}
+                    >
+                      {isLockedForRoleMismatch() ? <LuLock size={18} /> : <LuFilePlus size={18} />}
+                      + Create Survey
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -508,63 +948,35 @@ const WorkspaceDetail = () => {
               <h3>Workspace Activities</h3>
             </div>
             <div className={styles.activitiesList}>
-              {(activities || []).map((activity, index) => (
-                <div key={index} className={styles.activityCard}>
-                  <div className={styles.activityAvatar}>
-                    <div className={styles.avatarCircle}>
-                      {(activity.user?.full_name || activity.user?.username || 'U').charAt(0).toUpperCase()}
+              {(activities || [])
+                .filter(activity => {
+                  if (activity.action === 'role_mismatch_warning') {
+                    return (workspace.current_user_role || workspace.role) === 'owner';
+                  }
+                  return true;
+                })
+                .map((activity) => (
+                  <div key={activity.id} className={styles.activityItem}>
+                    <div className={`${styles.activityIcon} ${styles[activity.action]}`}>
+                      {getActivityIcon(activity.action)}
+                    </div>
+                    <div className={styles.activityContent}>
+                      <div className={styles.activityHeader}>
+                        <span className={styles.activityText}>
+                          {getActivityMessage(activity)}
+                        </span>
+                        <span className={styles.activityTime} title={new Date(activity.created_at).toLocaleString()}>
+                          {formatRelativeTime(activity.created_at)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className={styles.activityContent}>
-                    <div className={styles.activityHeader}>
-                      <span className={styles.activityUser}>
-                        {activity.user?.full_name || activity.user?.username || 'Unknown User'}
-                      </span>
-                      <span className={styles.activityAction}>
-                        {formatActivityAction(activity.action)}
-                      </span>
-                      <span className={styles.activityTime}>
-                        {new Date(activity.created_at).toLocaleString()}
-                      </span>
-                    </div>
-                    {activity.metadata && activity.action === 'workspace_updated' && (
-                      <div className={styles.activityDetails}>
-                        <div className={styles.changesSummary}>
-                          {activity.metadata.updated && (
-                            <div className={styles.changesItem}>
-                              <span className={styles.changesLabel}>Changes made:</span>
-                              <div className={styles.changesList}>
-                                {activity.metadata.previous?.name !== activity.metadata.updated?.name && (
-                                  <div className={styles.changeItem}>
-                                    <strong>Name:</strong> "{activity.metadata.previous?.name || 'None'}" → "{activity.metadata.updated?.name || 'None'}"
-                                  </div>
-                                )}
-                                {activity.metadata.previous?.description !== activity.metadata.updated?.description && (
-                                  <div className={styles.changeItem}>
-                                    <strong>Description:</strong> "{activity.metadata.previous?.description || 'None'}" → "{activity.metadata.updated?.description || 'None'}"
-                                  </div>
-                                )}
-                                {activity.metadata.previous?.visibility !== activity.metadata.updated?.visibility && (
-                                  <div className={styles.changeItem}>
-                                    <strong>Visibility:</strong> {activity.metadata.previous?.visibility || 'private'} → {activity.metadata.updated?.visibility || 'private'}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {activity.metadata && activity.action !== 'workspace_updated' && (
-                      <div className={styles.activityMeta}>
-                        <span className={styles.activityType}>Additional details available</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
               {(activities || []).length === 0 && (
                 <div className={styles.emptyState}>
+                  <div className={styles.emptyIcon}>
+                    <LuActivity size={32} />
+                  </div>
                   <p>No activities yet</p>
                   <p className={styles.emptyStateSubtext}>Workspace activities will appear here as members interact</p>
                 </div>
@@ -575,7 +987,7 @@ const WorkspaceDetail = () => {
       </div>
 
       {/* Invite Modal */}
-      <Modal 
+      <Modal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         title="Invite Member"
@@ -592,7 +1004,7 @@ const WorkspaceDetail = () => {
               required
             />
           </div>
-          
+
           <div className={styles.formGroup}>
             <label htmlFor="role">Role</label>
             <select
@@ -607,26 +1019,24 @@ const WorkspaceDetail = () => {
           </div>
 
           <div className={styles.formActions}>
-            <button 
-              type="button" 
+            <Button
+              variant="outline"
               onClick={() => setShowInviteModal(false)}
-              className={styles.cancelButton}
             >
               Cancel
-            </button>
-            <button 
-              type="submit" 
-              disabled={inviting}
-              className={styles.inviteSubmitButton}
+            </Button>
+            <Button
+              type="submit"
+              loading={inviting}
             >
-              {inviting ? 'Sending...' : 'Send Invitation'}
-            </button>
+              Send Invitation
+            </Button>
           </div>
         </form>
       </Modal>
 
       {/* Edit Workspace Modal */}
-      <Modal 
+      <Modal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
         title="Edit Workspace"
@@ -643,7 +1053,7 @@ const WorkspaceDetail = () => {
               required
             />
           </div>
-          
+
           <div className={styles.formGroup}>
             <label htmlFor="editDescription">Description (Optional)</label>
             <textarea
@@ -668,26 +1078,24 @@ const WorkspaceDetail = () => {
           </div>
 
           <div className={styles.formActions}>
-            <button 
-              type="button" 
+            <Button
+              variant="outline"
               onClick={() => setShowEditModal(false)}
-              className={styles.cancelButton}
             >
               Cancel
-            </button>
-            <button 
-              type="submit" 
-              disabled={updating}
-              className={styles.updateButton}
+            </Button>
+            <Button
+              type="submit"
+              loading={updating}
             >
-              {updating ? 'Updating...' : 'Update Workspace'}
-            </button>
+              Update Workspace
+            </Button>
           </div>
         </form>
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal 
+      <Modal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         title="Delete Workspace"
@@ -697,23 +1105,21 @@ const WorkspaceDetail = () => {
           <p className={styles.deleteWarning}>
             This action cannot be undone. All surveys, responses, and data associated with this workspace will be permanently deleted.
           </p>
-          
+
           <div className={styles.formActions}>
-            <button 
-              type="button" 
+            <Button
+              variant="outline"
               onClick={() => setShowDeleteModal(false)}
-              className={styles.cancelButton}
             >
               Cancel
-            </button>
-            <button 
-              type="button" 
+            </Button>
+            <Button
+              variant="danger"
               onClick={handleDeleteWorkspace}
-              disabled={deleting}
-              className={styles.deleteConfirmButton}
+              loading={deleting}
             >
-              {deleting ? 'Deleting...' : 'Delete Workspace'}
-            </button>
+              Delete Workspace
+            </Button>
           </div>
         </div>
       </Modal>
@@ -724,14 +1130,58 @@ const WorkspaceDetail = () => {
         message={`Are you sure you want to remove ${memberToRemove?.username} from this workspace?`}
         confirmText="Remove"
         cancelText="Cancel"
-        isDangerous
+        confirmColor="danger"
         onConfirm={handleConfirmRemove}
         onCancel={() => {
           setShowRemoveModal(false);
           setMemberToRemove(null);
         }}
       />
-    </div>
+
+      <ConfirmModal
+        isOpen={showLeaveModal}
+        title="Leave Workspace"
+        message={`Are you sure you want to leave "${workspace.name}"? You will need to be re-invited to access this workspace again.`}
+        confirmText={leaving ? 'Leaving...' : 'Leave Workspace'}
+        cancelText="Cancel"
+        confirmColor="danger"
+        onConfirm={handleLeaveWorkspace}
+        onCancel={() => setShowLeaveModal(false)}
+      />
+
+      {/* Delete Survey Confirmation */}
+      <ConfirmModal
+        isOpen={showDeleteSurveyModal}
+        onClose={() => setShowDeleteSurveyModal(false)}
+        onConfirm={confirmDeleteSurvey}
+        title="Delete Survey?"
+        message={`Are you sure you want to delete "${surveyToDelete?.title}"? This will delete all collected responses and cannot be undone.`}
+        confirmText="Delete Survey"
+        cancelText="Cancel"
+        confirmColor="danger"
+        isLoading={deleting}
+      />
+
+      {/* Upgrade Modals Integration */}
+      <UpgradeUpsellModal
+        isOpen={showUpsellModal}
+        onClose={() => setShowUpsellModal(false)}
+        onUpgrade={() => setShowUpgradeModal(true)}
+      />
+
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+      />
+
+      <InvitationWarningModal
+        isOpen={showInviteWarning}
+        onClose={() => setShowInviteWarning(false)}
+        inviteeEmail={pendingInvitation?.email}
+        selectedRole={pendingInvitation?.role}
+        onConfirm={() => executeInvitation(pendingInvitation.email, pendingInvitation.role)}
+      />
+    </div >
   );
 };
 

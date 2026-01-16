@@ -24,10 +24,31 @@ const WorkspaceActivity = require('./workspaceActivity.model')(sequelize, DataTy
 const ChatConversation = require('./chatConversation.model')(sequelize, DataTypes);
 const ChatMessage = require('./chatMessage.model')(sequelize, DataTypes);
 const SurveyAccess = require('./surveyAccess.model')(sequelize, DataTypes);
+const SystemSetting = require('./systemSetting.model')(sequelize, DataTypes);
+const GeneratedQuestion = require('./generatedQuestion.model')(sequelize, DataTypes);
+const SurveyFeedback = require('./surveyFeedback.model')(sequelize, DataTypes);
+const CreatorUpgradeRequest = require('./creatorUpgradeRequest.model')(sequelize, DataTypes);
 
 // Define associations
 User.hasMany(SurveyTemplate, { foreignKey: 'created_by' });
 SurveyTemplate.belongsTo(User, { foreignKey: 'created_by' });
+
+// ... (existing associations) ...
+
+// Creator Upgrade Request Associations
+User.hasMany(CreatorUpgradeRequest, { foreignKey: 'user_id', as: 'upgradeRequests' });
+CreatorUpgradeRequest.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+User.hasMany(CreatorUpgradeRequest, { foreignKey: 'reviewed_by', as: 'reviewedUpgradeRequests' });
+CreatorUpgradeRequest.belongsTo(User, { foreignKey: 'reviewed_by', as: 'reviewer' });
+
+module.exports = {
+  sequelize,
+  User,
+  // ... (other exports) ...
+  CreatorUpgradeRequest,
+  SurveyFeedback
+};
 
 SurveyTemplate.hasMany(Question, { foreignKey: 'template_id', as: 'Questions' });
 Question.belongsTo(SurveyTemplate, { foreignKey: 'template_id', as: 'template' });
@@ -40,6 +61,10 @@ QuestionOption.belongsTo(Question, { foreignKey: 'question_id' });
 
 SurveyTemplate.hasMany(Survey, { foreignKey: 'template_id', as: 'surveys' });
 Survey.belongsTo(SurveyTemplate, { foreignKey: 'template_id', as: 'template' });
+
+// Survey can have Questions directly (not just through template)
+// This allows quality.service.js to fetch questions for a survey
+Survey.hasMany(Question, { foreignKey: 'template_id', sourceKey: 'template_id', as: 'Questions' });
 
 User.hasMany(Survey, { foreignKey: 'created_by', as: 'surveys' });
 Survey.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
@@ -132,6 +157,13 @@ SurveyAccess.belongsTo(Survey, { foreignKey: 'survey_id', as: 'survey' });
 User.hasMany(SurveyAccess, { foreignKey: 'user_id', as: 'surveyAccess' });
 SurveyAccess.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 
+// Feedback Associations
+Survey.hasMany(SurveyFeedback, { foreignKey: 'survey_id', as: 'feedbacks' });
+SurveyFeedback.belongsTo(Survey, { foreignKey: 'survey_id', as: 'survey' });
+
+SurveyResponse.hasOne(SurveyFeedback, { foreignKey: 'response_id', as: 'feedback' });
+SurveyFeedback.belongsTo(SurveyResponse, { foreignKey: 'response_id', as: 'response' });
+
 User.hasMany(SurveyAccess, { foreignKey: 'granted_by', as: 'grantedAccess' });
 SurveyAccess.belongsTo(User, { foreignKey: 'granted_by', as: 'grantor' });
 
@@ -157,5 +189,9 @@ module.exports = {
   WorkspaceActivity,
   ChatConversation,
   ChatMessage,
-  SurveyAccess
+  SurveyAccess,
+  SystemSetting,
+  GeneratedQuestion,
+  SurveyFeedback,
+  CreatorUpgradeRequest
 };

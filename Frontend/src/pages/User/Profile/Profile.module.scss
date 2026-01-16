@@ -1,99 +1,169 @@
 .profileContainer {
-  padding: 2rem;
+  padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
 
   .header {
-    margin-bottom: 2rem;
+    margin-bottom: 32px;
 
     h1 {
-      font-size: 1.875rem;
+      font-size: 24px;
       font-weight: 600;
       color: #111827;
-      margin-bottom: 0.5rem;
+      margin: 0 0 8px 0;
     }
 
     p {
       color: #6b7280;
+      margin: 0;
     }
   }
 
   .content {
     display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 2rem;
+    grid-template-columns: 320px 1fr;
+    gap: 32px;
 
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
       grid-template-columns: 1fr;
     }
   }
 
   .userCard {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
     text-align: center;
-    padding: 2rem;
+    padding: 32px 24px;
 
     .avatar {
-      width: 100px;
-      height: 100px;
+      width: 80px;
+      height: 80px;
+      background: #e0e7ff;
+      color: #4f46e5;
       border-radius: 50%;
-      background: #10b981;
-      color: white;
-      font-size: 2.5rem;
-      font-weight: 600;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 1rem;
+      font-size: 32px;
+      font-weight: 600;
+      margin: 0 auto 16px auto;
     }
 
     h2 {
-      font-size: 1.25rem;
+      font-size: 20px;
       font-weight: 600;
-      color: #111827;
-      margin-bottom: 0.5rem;
+      margin: 0 0 8px 0;
+      color: #1f2937;
     }
 
     .roleBadge {
       display: inline-block;
-      padding: 0.25rem 0.75rem;
-      background: #e5e7eb;
-      color: #374151;
-      border-radius: 9999px;
-      font-size: 0.875rem;
+      padding: 4px 12px;
+      border-radius: 99px;
+      font-size: 12px;
       font-weight: 500;
-      margin-bottom: 0.5rem;
-      text-transform: capitalize;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    .roleAdmin {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .roleCreator {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .roleUser {
+      background: #f3f4f6;
+      color: #374151;
     }
 
     .email {
       color: #6b7280;
-      font-size: 0.875rem;
+      font-size: 14px;
     }
+  }
+
+  .rightColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .sectionCard {
+    // Additional styling if needed for cards
   }
 
   .formGrid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
 
-    @media (max-width: 640px) {
+    @media (max-width: 600px) {
       grid-template-columns: 1fr;
     }
   }
 
-  .readOnly {
-    opacity: 0.7;
-    cursor: not-allowed;
+  .readOnlyInput {
+    background-color: #f9fafb;
+    color: #6b7280;
   }
 
   .actions {
+    margin-top: 24px;
     display: flex;
     justify-content: flex-end;
-    padding-top: 1rem;
+  }
+
+  .primaryButton {
+    min-width: 120px;
+  }
+
+  /* Password Section */
+  .passwordGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .divider {
+    border: 0;
     border-top: 1px solid #e5e7eb;
+    margin: 8px 0;
+  }
+
+  .newPasswordSection {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .strengthMeter {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: -8px;
+    padding-left: 2px; // Align roughly with input label visual
+
+    .strengthBar {
+      flex: 1;
+      height: 4px;
+      background: #e5e7eb;
+      border-radius: 2px;
+      overflow: hidden;
+      max-width: 200px;
+
+      .strengthFill {
+        height: 100%;
+        transition: all 0.3s ease;
+      }
+    }
+
+    .strengthLabel {
+      font-size: 12px;
+      font-weight: 500;
+      min-width: 50px;
+    }
   }
 }

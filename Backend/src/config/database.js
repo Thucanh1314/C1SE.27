@@ -50,22 +50,22 @@ const sequelize = new Sequelize(
 sequelize
   .authenticate()
   .then(() => {
-    logger.info('✅ MySQL connection established successfully', {
+    logger.info(' MySQL connection established successfully', {
       host: dbConfig.host,
       port: dbConfig.port,
       database: dbConfig.database
     });
   })
   .catch((err) => {
-    logger.error('❌ Unable to connect to MySQL database', {
+    logger.error(' Unable to connect to MySQL database', {
       host: dbConfig.host,
       port: dbConfig.port,
       database: dbConfig.database,
       error: err.message
     });
-    logger.error('💡 Check if MySQL is running at the configured host:port');
-    logger.error('💡 For Docker: docker-compose up -d');
-    logger.error('💡 For local MySQL: verify DB_HOST and DB_PORT in .env');
+    logger.error(' Check if MySQL is running at the configured host:port');
+    logger.error(' For Docker: docker-compose up -d');
+    logger.error(' For local MySQL: verify DB_HOST and DB_PORT in .env');
   });
 
 module.exports = sequelize;

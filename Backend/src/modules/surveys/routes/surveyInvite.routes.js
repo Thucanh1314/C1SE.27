@@ -6,6 +6,7 @@ const { authenticate } = require('../../../middleware/auth.middleware');
 
 // Public route - validate invite token
 router.get('/invites/:token/validate', surveyInviteController.validateInvite);
+router.post('/invites/:token/accept', surveyInviteController.acceptInvite);
 
 // Protected routes - require authentication
 router.post('/surveys/:id/invites', authenticate, surveyInviteController.createInvites);

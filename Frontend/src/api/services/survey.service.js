@@ -20,6 +20,23 @@ const SurveyService = {
     }
   },
 
+  /**
+   * Get surveys assigned to current user
+   */
+  async getAssigned(params = {}) {
+    try {
+      const response = await http.get('/surveys/assigned', { params });
+      const data = response.data.data || response.data || {};
+      return {
+        surveys: data.surveys || [],
+        pagination: data.pagination || null
+      };
+    } catch (error) {
+      console.error('Error in SurveyService.getAssigned:', error);
+      return { surveys: [], pagination: null };
+    }
+  },
+
   async getAllSurveys(params = {}) {
     return this.getAll(params);
   },
@@ -104,6 +121,14 @@ const SurveyService = {
    */
   async updateStatus(id, status) {
     const response = await http.patch(`/surveys/${id}/status`, { status });
+    return response.data;
+  },
+
+  /**
+   * Restore archived survey
+   */
+  async restore(id) {
+    const response = await http.patch(`/surveys/${id}/restore`);
     return response.data;
   },
 

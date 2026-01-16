@@ -8,13 +8,13 @@ $font-family-base: 'Inter', 'Segoe UI', 'Roboto', -apple-system, BlinkMacSystemF
 $font-family-mono: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
 
 // Font Sizes (rem-based) - Standard readable scale
-$font-size-sm: 0.875rem;     // 14px - Small text, minimum size
-$font-size-base: 1rem;       // 16px - Body text, forms, buttons
-$font-size-md: 1.125rem;     // 18px - Emphasized text
-$font-size-lg: 1.25rem;      // 20px - Section headers
-$font-size-xl: 1.5rem;       // 24px - Page titles
-$font-size-2xl: 1.75rem;     // 28px - Hero titles
-$font-size-3xl: 2rem;        // 32px - Display text
+$font-size-sm: 0.875rem; // 14px - Small text, minimum size
+$font-size-base: 1rem; // 16px - Body text, forms, buttons
+$font-size-md: 1.125rem; // 18px - Emphasized text
+$font-size-lg: 1.25rem; // 20px - Section headers
+$font-size-xl: 1.5rem; // 24px - Page titles
+$font-size-2xl: 1.75rem; // 28px - Hero titles
+$font-size-3xl: 2rem; // 32px - Display text
 
 // Font Weights
 $font-weight-normal: 400;
@@ -38,6 +38,7 @@ $letter-spacing-wide: 0.025em;
 
 $primary: #14B8A6;
 $primary-dark: #0F766E;
+$primary-hover: #0D9488;
 $secondary: #6b7280;
 $danger: #ef4444;
 $warning: #f59e0b;
@@ -60,23 +61,23 @@ $gray-900: #111827;
 // Spacing Scale
 // ==========================================
 
-$spacing-xs: 0.25rem;   // 4px
-$spacing-sm: 0.5rem;    // 8px
-$spacing-md: 1rem;      // 16px
-$spacing-lg: 1.5rem;    // 24px
-$spacing-xl: 2rem;      // 32px
-$spacing-2xl: 3rem;     // 48px
-$spacing-3xl: 4rem;     // 64px
+$spacing-xs: 0.25rem; // 4px
+$spacing-sm: 0.5rem; // 8px
+$spacing-md: 1rem; // 16px
+$spacing-lg: 1.5rem; // 24px
+$spacing-xl: 2rem; // 32px
+$spacing-2xl: 3rem; // 48px
+$spacing-3xl: 4rem; // 64px
 
 // ==========================================
 // Border Radius
 // ==========================================
 
-$border-radius-sm: 0.25rem;   // 4px
-$border-radius-md: 0.5rem;    // 8px
-$border-radius-lg: 0.75rem;   // 12px
-$border-radius-xl: 1rem;      // 16px
-$border-radius-2xl: 1.5rem;   // 24px
+$border-radius-sm: 0.25rem; // 4px
+$border-radius-md: 0.5rem; // 8px
+$border-radius-lg: 0.75rem; // 12px
+$border-radius-xl: 1rem; // 16px
+$border-radius-2xl: 1.5rem; // 24px
 
 // ==========================================
 // Shadows
@@ -121,4 +122,3 @@ $breakpoint-laptop-sm: 1024px;
 $transition-fast: 0.15s ease-in-out;
 $transition-base: 0.2s ease-in-out;
 $transition-slow: 0.3s ease-in-out;
-

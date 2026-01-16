@@ -31,7 +31,7 @@ const WorkspaceService = {
       };
     } catch (error) {
       console.error('[WorkspaceService.getMyWorkspaces] ERROR:', error);
-      
+
       // If error response has data, use that message
       const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch workspaces';
       console.error('[WorkspaceService.getMyWorkspaces] Error message:', errorMessage);
@@ -62,7 +62,7 @@ const WorkspaceService = {
 
       const responseData = response.data || {};
       const { ok, success, workspace } = responseData;
-      
+
       // Backend returns workspace directly in response.data.workspace
       const workspaceData = workspace || responseData.data?.workspace || responseData.data;
 
@@ -227,7 +227,116 @@ const WorkspaceService = {
 
       return {
         ok: false,
-        error: error.message || 'Failed to remove workspace member',
+        error: error.response?.data?.message || error.message || 'Failed to remove workspace member',
+      };
+    }
+  },
+
+  /**
+   * Update member role in a workspace
+   * @param {string} workspaceId - Workspace ID
+   * @param {string} memberId - Member ID
+   * @param {string} role - New role (owner, collaborator, member, viewer)
+   * @returns {Promise<{ok: boolean, member?: Object, error?: string}>}
+   */
+  async updateMemberRole(workspaceId, memberId, role) {
+    try {
+      if (!workspaceId) {
+        throw new Error('Workspace ID is required');
+      }
+
+      if (!memberId) {
+        throw new Error('Member ID is required');
+      }
+
+      if (!role) {
+        throw new Error('Role is required');
+      }
+
+      const response = await http.patch(`/workspaces/${workspaceId}/members/${memberId}`, { role });
+      console.log(`[WorkspaceService.updateMemberRole] Updated member ${memberId} role in workspace ${workspaceId}:`, response.data);
+
+      const responseData = response.data || {};
+      const { ok, success, member } = responseData;
+
+      return {
+        ok: ok !== false && success !== false,
+        member: member || null,
+      };
+    } catch (error) {
+      console.error(`[WorkspaceService.updateMemberRole] ERROR:`, error.message || error);
+
+      return {
+        ok: false,
+        error: error.response?.data?.message || error.message || 'Failed to update member role',
+      };
+    }
+  },
+
+
+  /**
+   * Leave a workspace
+   * @param {string} workspaceId - Workspace ID
+   * @returns {Promise<{ok: boolean, error?: string}>}
+   */
+  async leaveWorkspace(workspaceId) {
+    try {
+      if (!workspaceId) {
+        throw new Error('Workspace ID is required');
+      }
+
+      const response = await http.post(`/workspaces/${workspaceId}/leave`);
+      console.log(`[WorkspaceService.leaveWorkspace] Left workspace ${workspaceId}:`, response.data);
+
+      const responseData = response.data || {};
+      const { ok, success } = responseData;
+
+      return {
+        ok: ok !== false && success !== false,
+        message: responseData.message || 'Successfully left workspace',
+      };
+    } catch (error) {
+      console.error(`[WorkspaceService.leaveWorkspace] ERROR:`, error.message || error);
+
+      return {
+        ok: false,
+        error: error.response?.data?.message || error.message || 'Failed to leave workspace',
+      };
+    }
+  },
+
+  /**
+   * Transfer workspace ownership to another member
+   * @param {string} workspaceId - Workspace ID
+   * @param {string} newOwnerId - New owner user ID
+   * @returns {Promise<{ok: boolean, error?: string}>}
+   */
+  async transferOwnership(workspaceId, newOwnerId) {
+    try {
+      if (!workspaceId) {
+        throw new Error('Workspace ID is required');
+      }
+
+      if (!newOwnerId) {
+        throw new Error('New owner ID is required');
+      }
+
+      const response = await http.post(`/workspaces/${workspaceId}/transfer-ownership`, { newOwnerId });
+      console.log(`[WorkspaceService.transferOwnership] Transferred ownership of workspace ${workspaceId}:`, response.data);
+
+      const responseData = response.data || {};
+      const { ok, success } = responseData;
+
+      return {
+        ok: ok !== false && success !== false,
+        message: responseData.message || 'Ownership transferred successfully',
+      };
+    } catch (error) {
+      console.error(`[WorkspaceService.transferOwnership] ERROR:`, error.message || error);
+
+      return {
+        ok: false,
+        error: error.response?.data?.message || error.message || 'Failed to transfer ownership',
       };
     }
   },
@@ -285,6 +394,30 @@ const WorkspaceService = {
       return {
         ok: false,
         error: error.response?.data?.message || error.message || 'Failed to accept invitation'
+      };
+    }
+  },
+
+  /**
+   * Decline workspace invitation
+   * @param {string|number} invitationId - Invitation ID
+   * @returns {Promise<{ok: boolean, message?: string, error?: string}>}
+   */
+  async declineInvitation(invitationId) {
+    try {
+      const response = await http.post(`/workspaces/invitations/${invitationId}/decline`);
+      console.log('[WorkspaceService.declineInvitation] Response:', response.data);
+
+      return {
+        ok: response.data.ok !== false,
+        message: response.data.message || 'Invitation declined successfully'
+      };
+    } catch (error) {
+      console.error('[WorkspaceService.declineInvitation] ERROR:', error.message || error);
+
+      return {
+        ok: false,
+        error: error.response?.data?.message || error.message || 'Failed to decline invitation'
       };
     }
   },
@@ -367,31 +500,6 @@ const WorkspaceService = {
       return {
         ok: false,
         error: error.response?.data?.message || error.message || 'Failed to delete workspace'
-      };
-    }
-  },
-
-  /**
-   * Accept workspace invitation via token
-   * @param {string} token - Invitation token
-   * @returns {Promise<{ok: boolean, workspace?: Object, message?: string}>}
-   */
-  async acceptInvitation(token) {
-    try {
-      const response = await http.post('/workspaces/accept-invitation', { token });
-      console.log('[WorkspaceService.acceptInvitation] Response:', response.data);
-
-      return {
-        ok: response.data.ok !== false,
-        workspace: response.data.workspace,
-        message: response.data.message
-      };
-    } catch (error) {
-      console.error('[WorkspaceService.acceptInvitation] ERROR:', error.message || error);
-
-      return {
-        ok: false,
-        error: error.response?.data?.message || error.message || 'Failed to accept invitation'
       };
     }
   },
@@ -517,13 +625,14 @@ const WorkspaceService = {
       if (params.page) queryParams.append('page', params.page);
       if (params.limit) queryParams.append('limit', params.limit);
       if (params.search) queryParams.append('search', params.search);
+      if (params.scope) queryParams.append('scope', params.scope);
 
       const response = await http.get(`/workspaces/my?${queryParams.toString()}`);
       console.log('[WorkspaceService.getMyWorkspacesPaginated] Response:', response.data);
 
       const responseData = response.data || {};
       const { ok, success, data } = responseData;
-      
+
       const workspaces = data?.workspaces || data?.items || responseData.workspaces || responseData.items || [];
       const pagination = data?.pagination || responseData.pagination || {};
       const total = pagination.total || data?.total || responseData.total || workspaces.length;
@@ -536,7 +645,7 @@ const WorkspaceService = {
       };
     } catch (error) {
       console.error('[WorkspaceService.getMyWorkspacesPaginated] ERROR:', error);
-      
+
       return {
         ok: false,
         items: [],
@@ -578,6 +687,44 @@ const WorkspaceService = {
         ok: false,
         deletedCount: 0,
         error: error.response?.data?.message || error.message || 'Failed to delete workspaces'
+      };
+    }
+  },
+
+  /**
+   * Request a role upgrade in a workspace
+   * @param {string} id - Workspace ID
+   * @param {string} requestedRole - The role being requested
+   * @returns {Promise<{ok: boolean, message?: string, error?: string}>}
+   */
+  async requestPromotion(id, requestedRole) {
+    try {
+      const response = await http.post(`/workspaces/${id}/request-promotion`, { requestedRole });
+      return response.data;
+    } catch (error) {
+      console.error('[WorkspaceService.requestPromotion] ERROR:', error);
+      return {
+        ok: false,
+        message: error.response?.data?.message || error.message || 'Failed to request promotion'
+      };
+    }
+  },
+
+  /**
+   * Approve or decline a role change request
+   * @param {string} notificationId - Notification ID
+   * @param {string} action - "approve" or "decline"
+   * @returns {Promise<{ok: boolean, message?: string, error?: string}>}
+   */
+  async handleRoleRequest(notificationId, action) {
+    try {
+      const response = await http.post(`/workspaces/notifications/${notificationId}/handle-role-request`, { action });
+      return response.data;
+    } catch (error) {
+      console.error('[WorkspaceService.handleRoleRequest] ERROR:', error);
+      return {
+        ok: false,
+        message: error.response?.data?.message || error.message || 'Failed to handle role request'
       };
     }
   }
